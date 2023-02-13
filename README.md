@@ -1,15 +1,4 @@
-# Links
-* 
+# Camera Chess
 
-
-# Questions
-
-* Where do we get more data?
-  * YouTube videos? 
-  * Image search engines (Flickr, Google) etc.? 
-  * Film videos ourselves?
-
-* What board detection method should we use? 
-  * Does it make sense to use a keypoints model?
-  * How do we get the keypoints data?
+Latest export: "project-1-at-2023-02-11-23-25-9ba82158"
 

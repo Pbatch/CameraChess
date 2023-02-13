@@ -1,0 +1,13 @@
+fiftyone
+imagesize
+ultralytics
+pytorch-lightning
+opencv-python
+torch
+torchvision
+numpy
+Pillow
+torchmetrics
+wandb
+chess
+albumentations

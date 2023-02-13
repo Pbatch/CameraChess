@@ -1,5 +1,6 @@
 data
 label_studio
 LiveChess2FEN
+chesscog
 .idea/
 **/__pycache__/
