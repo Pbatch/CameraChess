@@ -10,7 +10,7 @@ from glob import glob
 
 
 def main():
-    dataset_name = 'roboflow_5'
+    dataset_name = 'roboflow_4'
     for image_path in tqdm(glob(f'data/{dataset_name}/images/*.jpg')):
         yolo_path = image_path.replace('images', 'yolov5').replace('.jpg', '.txt')
 

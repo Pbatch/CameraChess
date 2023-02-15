@@ -20,7 +20,7 @@ def main(image_size, train_fraction):
                 shutil.rmtree(p)
             os.makedirs(p)
 
-    for dataset in ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_5']:
+    for dataset in ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5']:
         for label_path in tqdm(glob(os.path.join('data', dataset, 'labels', '*'))):
             with open(label_path, 'r') as f:
                 label = json.load(f)
@@ -33,6 +33,8 @@ def main(image_size, train_fraction):
             pieces = [bbox[0] for bbox in label['bboxes']]
             bboxes = np.array([bbox[1:] for bbox in label['bboxes']])
 
+            keypoints[:, 0] *= image_width
+            keypoints[:, 1] *= image_height
             x_min = keypoints[:, 0].min()
             y_min = keypoints[:, 1].min()
             x_max = keypoints[:, 0].max()

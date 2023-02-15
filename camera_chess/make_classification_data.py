@@ -16,7 +16,7 @@ from camera_chess.constants import LABEL_STUDIO_DIR, UPLOAD_DIR, ROOT_DIR, CORNE
 SQUARE_SIZE = 128
 HALF_SQUARE_SIZE = SQUARE_SIZE // 2
 BOARD_SIZE = 8 * SQUARE_SIZE
-WARP_SIZE = BOARD_SIZE + SQUARE_SIZE
+WARP_SIZE = BOARD_SIZE
 
 
 def get_square(x, y):
@@ -27,7 +27,7 @@ def get_matrix(corners, shift):
     target = np.array([[BOARD_SIZE, BOARD_SIZE],
                        [0, BOARD_SIZE],
                        [0, 0],
-                       [BOARD_SIZE + 0, 0]], dtype=np.float32) + shift
+                       [BOARD_SIZE, 0]], dtype=np.float32) + shift
     matrix = cv2.getPerspectiveTransform(corners, target)
     return matrix
 

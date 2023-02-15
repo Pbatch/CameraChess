@@ -10,11 +10,11 @@ from camera_chess.constants import ROOT_DIR
 def load_label_studio():
     samples = []
     keypoint_order = ['h1', 'a1', 'a8', 'h8']
-    for dataset in ['google']:
-        for image_path in glob(os.path.join('data', dataset, 'images', '*')):
+    for dataset in ['roboflow_4']:
+        for image_path in glob(os.path.join('data', dataset, 'images2', '*')):
             sample = fo.Sample(filepath=image_path)
 
-            label_path = image_path.replace('images', 'labels').replace('.jpg', '.json')
+            label_path = image_path.replace('images2', 'labels').replace('.jpg', '.json')
             with open(label_path, 'r') as f:
                 label = json.load(f)
             keypoints = [fo.Keypoint(label="board",
@@ -49,7 +49,7 @@ def load_yolo():
 
 
 def main():
-    dataset = load_label_studio().shuffle()
+    dataset = load_yolo().shuffle()
     session = fo.launch_app(dataset)
     session.wait()
 
