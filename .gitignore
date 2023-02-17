@@ -1,6 +1,5 @@
 data
 label_studio
-LiveChess2FEN
-chesscog
+sparseml
 .idea/
 **/__pycache__/

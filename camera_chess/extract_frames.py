@@ -5,9 +5,10 @@ from tqdm import tqdm
 
 
 def main():
-    target_fps = 1
-    for path in tqdm(glob(os.path.join('data', 'videos', '*'))):
-        frames_dir = path.replace(f'{os.path.sep}videos{os.path.sep}', f'{os.path.sep}frames{os.path.sep}')
+    target_fps = 2
+    for path in tqdm(glob(os.path.join('data', 'youtube', 'videos', '*'))):
+        frames_dir = os.path.join('data', 'youtube', 'frames',
+                                  os.path.splitext(os.path.basename(path))[0])
         os.makedirs(frames_dir, exist_ok=True)
         cap = cv2.VideoCapture(path)
         fps = round(cap.get(cv2.CAP_PROP_FPS))

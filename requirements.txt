@@ -11,3 +11,5 @@ torchmetrics
 wandb
 chess
 albumentations
+reportlab
+svglib
