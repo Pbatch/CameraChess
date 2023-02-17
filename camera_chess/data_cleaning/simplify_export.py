@@ -5,12 +5,12 @@ from PIL import Image
 
 
 def main():
-    export_id = 'project-1-at-2023-02-13-17-09-5f337ef3'
-    dataset = 'roboflow_4'
+    export_id = 'project-1-at-2023-02-17-13-10-401bb257'
+    dataset = 'hikaru_sarin'
     with open(os.path.join(f'label_studio/data/export/{export_id}.json')) as f:
         labels = json.load(f)
 
-    for i, label in enumerate(labels):
+    for i, label in enumerate(labels[:20]):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
         for annotation in label['annotations'][0]['result']:

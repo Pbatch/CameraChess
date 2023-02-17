@@ -30,7 +30,7 @@ def main():
     classifier = Classifier(model_path='data/best.onnx',
                             conf_thres=0.1,
                             keypoints=keypoints)
-    for image_path in glob('data/hikaru/crops/*.jpg')[:1]:
+    for image_path in glob('data/hikaru_sarin/images/*.jpg'):
         basename = os.path.basename(image_path)
         new_image_path = os.path.join('label_studio', 'files', 'images', basename)
         shutil.copyfile(image_path, new_image_path)

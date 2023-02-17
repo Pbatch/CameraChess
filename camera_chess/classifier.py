@@ -113,9 +113,10 @@ class Classifier:
 
     def _run_od(self, np_image, width, height):
         pred = self.sess.run([self.output_name], {self.input_name: np_image})[0]
+        pred[:, [0, 2], :] *= width / self.onnx_width
+        pred[:, [1, 3], :] *= height / self.onnx_height
         pred = np.array(self.nms(pred)[0])
-        pred[:, [0, 2]] *= width / self.onnx_width
-        pred[:, [1, 3]] *= height / self.onnx_height
+
         return pred
 
     def _post_process_pred(self, pred):
@@ -148,7 +149,7 @@ class Classifier:
 
         return clean_pred
 
-    def run(self, image):
+    def run(self, image, keypoints):
         np_image = self._preprocess_image(image)
         pred = self._run_od(np_image, image.width, image.height)
         pred = self._post_process_pred(pred)

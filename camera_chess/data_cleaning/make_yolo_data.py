@@ -20,7 +20,9 @@ def main(image_size, train_fraction):
                 shutil.rmtree(p)
             os.makedirs(p)
 
-    for dataset in ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5']:
+    datasets = ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5',
+                'chesscog', 'hikaru_sarin']
+    for dataset in datasets:
         for label_path in tqdm(glob(os.path.join('data', dataset, 'labels', '*'))):
             with open(label_path, 'r') as f:
                 label = json.load(f)

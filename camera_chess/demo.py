@@ -19,15 +19,17 @@ def main():
                             keypoints=keypoints)
     visualizer = Visualizer()
     state = State(keypoints)
+    i = 0
     for path in image_paths:
         image = Image.open(path).convert('RGB')
-        pred = classifier.run(image)
+        pred = classifier.run(image, keypoints)
         state.update(pred)
         if state.change:
             print(state.game)
             image = visualizer.add_bboxes(image, pred)
             image = visualizer.add_board(image, state)
-            image.save(path.replace('crops', 'positions'))
+            image.show()
+            input()
     visualizer.create_gif(os.path.join('data', 'hikaru', 'positions'), 'replay.gif')
 
 
