@@ -1,39 +1,47 @@
 import io
-import random
+import math
 
 import cairosvg
 import chess
 import chess.pgn
 import chess.svg
 from PIL import Image
-from icecream import ic
 
 from camera_chess.constants import PIECE_TO_CLASS
 
 
 class Action:
-    def __init__(self, move, square_to_pred, piece):
+    def __init__(self, move, board):
         self.move = move
-        self.square_to_pred = square_to_pred
-        self.piece = piece
+        self.board = board
 
-        self.score = self._calculate_score()
+        self.prev_center = None
+        self.score = 0
+        self.from_square = chess.SQUARE_NAMES[self.move.from_square]
+        self.to_square = chess.SQUARE_NAMES[self.move.to_square]
+        self.piece = PIECE_TO_CLASS[self.board.piece_at(self.move.from_square)]
 
-    def _calculate_score(self):
-        from_square = chess.SQUARE_NAMES[self.move.from_square]
-        to_square = chess.SQUARE_NAMES[self.move.to_square]
+    def update(self, square_to_pred):
+        if self.from_square in square_to_pred:
+            self.score = 0
+            return
 
-        if from_square in self.square_to_pred:
-            return 0
+        if self.to_square not in square_to_pred:
+            self.score = 0
+            return
 
-        if to_square not in self.square_to_pred:
-            return 0
-
-        pred = self.square_to_pred[to_square]
+        pred = square_to_pred[self.to_square]
         if pred.piece != self.piece:
-            return 0
+            self.score = 0
+            return
 
-        return random.random()
+        if self.prev_center is None:
+            self.prev_center = pred.center
+            self.score = 0
+            return
+
+        velocity = math.dist(self.prev_center, pred.center)
+        self.score = 1
 
 
 class State:
@@ -44,9 +52,18 @@ class State:
         self.game = chess.pgn.Game()
         self.node = self.game
         self.change = False
+        self.actions = [Action(move, self.board)
+                        for move in list(self.board.legal_moves)]
 
     def __repr__(self):
         return str(self.board)
+
+    def _play_move(self, move):
+        self.board.push(move)
+        self.node = self.node.add_variation(move)
+        self.actions = [Action(move, self.board)
+                        for move in list(self.board.legal_moves)]
+        self.change = True
 
     def get_image(self):
         bytestring = chess.svg.board(self.board, size=300)
@@ -59,25 +76,14 @@ class State:
     def update(self, pred):
         self.change = False
 
-        # piece_map = self.board.piece_map()
-        # gt_squares = set([chess.SQUARE_NAMES[i] for i in piece_map.keys()])
-        # pred_squares = set([p.square for p in pred])
-        #
-        # missing_detections = list(gt_squares - pred_squares)
-        # new_detections = list(pred_squares - gt_squares)
-        # ic(missing_detections)
-        # ic(new_detections)
         square_to_pred = {p.square: p for p in pred}
+        for action in self.actions:
+            action.update(square_to_pred)
 
-        legal_moves = list(self.board.legal_moves)
-        actions = [Action(move, square_to_pred,
-                          PIECE_TO_CLASS[self.board.piece_at(move.from_square)])
-                   for move in legal_moves]
-        best_action = max(actions, key=lambda x: x.score)
+        best_action = max(self.actions, key=lambda x: x.score)
         if best_action.score == 0:
             return
 
-        ic(best_action.score)
-        self.board.push(best_action.move)
-        self.node = self.node.add_variation(best_action.move)
-        self.change = True
+        self._play_move(best_action.move)
+
+

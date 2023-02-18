@@ -21,7 +21,7 @@ def main(image_size, train_fraction):
             os.makedirs(p)
 
     datasets = ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5',
-                'chesscog', 'hikaru_sarin']
+                'hikaru_sarin']#, 'chesscog']
     for dataset in datasets:
         for label_path in tqdm(glob(os.path.join('data', dataset, 'labels', '*'))):
             with open(label_path, 'r') as f:
@@ -77,7 +77,7 @@ def main(image_size, train_fraction):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--image_size', type=int, default=640)
+    parser.add_argument('-s', '--image_size', type=int, default=480)
     parser.add_argument('-f', '--train_fraction', type=float, default=0.9)
     args = parser.parse_args()
     main(args.image_size, args.train_fraction)

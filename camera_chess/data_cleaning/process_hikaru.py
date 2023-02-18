@@ -19,7 +19,6 @@ def crop():
 
 
 def main():
-
     crop()
 
 

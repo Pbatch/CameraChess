@@ -5,8 +5,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 LABEL_STUDIO_DIR = os.path.join(ROOT_DIR, 'label_studio')
 UPLOAD_DIR = os.path.join(LABEL_STUDIO_DIR, 'data', 'media', 'upload')
 CLASSES = ['black-bishop', 'black-king', 'black-knight', 'black-pawn', 'black-queen', 'black-rook',
-           'white-bishop', 'white-king', 'white-knight', 'white-pawn', 'white-queen', 'white-rook',
-           'empty']
+           'white-bishop', 'white-king', 'white-knight', 'white-pawn', 'white-queen', 'white-rook']
 CLASS_TO_PIECE = {'black-bishop': chess.Piece(chess.BISHOP, chess.BLACK),
                   'black-king': chess.Piece(chess.KING, chess.BLACK),
                   'black-knight': chess.Piece(chess.KNIGHT, chess.BLACK),

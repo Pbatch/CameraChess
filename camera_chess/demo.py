@@ -1,35 +1,41 @@
 import os
-from glob import glob
 
 import numpy as np
-from PIL import Image
 
 from camera_chess.classifier import Classifier
 from camera_chess.state import State
+from camera_chess.video import Video
 from camera_chess.visualizer import Visualizer
 
 
 def main():
-    keypoints = np.array([[177, 476], [16, 171], [574, 73], [884, 318]], dtype=np.float32)
-    image_paths = sorted(glob('data/hikaru/crops/*.jpg'),
-                         key=lambda x: int(os.path.basename(x).replace('.jpg', '')))
+    # start = TODO
+    # end = TODO
+    # video_path = 'data/youtube/It_s_Blitz_says_Hikaru_Nakamura_after_his_game_against_Nihal_Sarin_World_Blitz_2022.webm'
+    # keypoints = np.array([[778, 1028], [616, 723], [1181, 624], [1481, 869]], dtype=np.float32)
 
-    classifier = Classifier(model_path='data/best.onnx',
+    start = 81
+    end = 428
+    video_path = 'data/youtube/Dubov_s_Phenomenal_opening_preparation_leaves_Nepomniachtchi_clueless_World_Blitz_2022.webm'
+    keypoints = np.array([[493, 882], [759, 619], [1263, 685], [1150, 1005]], dtype=np.float32)
+
+    video = Video(video_path, keypoints, start, end, target_fps=4)
+    classifier = Classifier(model_path='data/480M.onnx',
                             conf_thres=0.3,
-                            keypoints=keypoints)
+                            keypoints=video.new_keypoints)
     visualizer = Visualizer()
-    state = State(keypoints)
+    state = State(video.new_keypoints)
     i = 0
-    for path in image_paths:
-        image = Image.open(path).convert('RGB')
-        pred = classifier.run(image, keypoints)
+    for image in video:
+        pred = classifier.run(image)
         state.update(pred)
         if state.change:
             print(state.game)
             image = visualizer.add_bboxes(image, pred)
             image = visualizer.add_board(image, state)
+            image.save(os.path.join('data', 'hikaru', 'positions', f'{i}.jpg'))
             image.show()
-            input()
+            i += 1
     visualizer.create_gif(os.path.join('data', 'hikaru', 'positions'), 'replay.gif')
 
 

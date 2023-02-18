@@ -1,4 +1,12 @@
 # Camera Chess
 
-Latest export: "project-1-at-2023-02-11-23-25-9ba82158"
+## TODO
+
+* Write function to crop out ROI from videos
+
+## Links
+* Chesscog - https://github.com/georg-wolflein/chesscog
+
+## Papers
+* Chesscog - https://github.com/georg-wolflein/chesscog-report/raw/master/report.pdf
 
