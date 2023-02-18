@@ -5,12 +5,14 @@ from PIL import Image
 
 
 def main():
-    export_id = 'project-1-at-2023-02-17-13-10-401bb257'
-    dataset = 'hikaru_sarin'
+    export_id = 'project-1-at-2023-02-18-14-33-dfa6cf28'
+    dataset = 'dubov_nepo'
     with open(os.path.join(f'label_studio/data/export/{export_id}.json')) as f:
         labels = json.load(f)
 
-    for i, label in enumerate(labels[:20]):
+    os.makedirs(os.path.join('data', dataset, 'labels'))
+    os.makedirs(os.path.join('data', dataset, 'images'))
+    for i, label in enumerate(labels):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
         for annotation in label['annotations'][0]['result']:
@@ -33,7 +35,7 @@ def main():
         basename = os.path.basename(label['data']['img'])
         image = Image.open(os.path.join('label_studio', 'files', 'images', basename))
         image = image.convert('RGB')
-        new_image_path = f'data/{dataset}/images2/{i}.jpg'
+        new_image_path = f'data/{dataset}/images/{i}.jpg'
         image.save(new_image_path)
 
 

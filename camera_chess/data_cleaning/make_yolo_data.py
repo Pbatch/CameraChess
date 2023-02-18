@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import subprocess
+import random
 from glob import glob
 
 import numpy as np
@@ -12,7 +13,7 @@ from tqdm import tqdm
 from camera_chess.constants import ROOT_DIR, CLASSES
 
 
-def main(image_size, train_fraction):
+def main(image_size, train_fraction, max_split_size):
     for split in ['train', 'val']:
         for i in ['images', 'labels']:
             p = os.path.join('data', 'yolo', split, i)
@@ -21,9 +22,12 @@ def main(image_size, train_fraction):
             os.makedirs(p)
 
     datasets = ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5',
-                'hikaru_sarin']#, 'chesscog']
+                'hikaru_sarin', 'dubov_nepo', 'chesscog']
     for dataset in datasets:
-        for label_path in tqdm(glob(os.path.join('data', dataset, 'labels', '*'))):
+        label_paths = list(glob(os.path.join('data', dataset, 'labels', '*')))
+        if len(label_paths) > max_split_size:
+            label_paths = random.sample(label_paths, max_split_size)
+        for label_path in tqdm(label_paths, desc=dataset):
             with open(label_path, 'r') as f:
                 label = json.load(f)
 
@@ -79,5 +83,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--image_size', type=int, default=480)
     parser.add_argument('-f', '--train_fraction', type=float, default=0.9)
+    parser.add_argument('-m', '--max_split_size', type=int, default=500)
     args = parser.parse_args()
-    main(args.image_size, args.train_fraction)
+    main(args.image_size, args.train_fraction, args.max_split_size)

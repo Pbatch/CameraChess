@@ -2,7 +2,7 @@
 
 ## TODO
 
-* Write function to crop out ROI from videos
+* Label more video data
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

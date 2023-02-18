@@ -1,33 +1,72 @@
+import json
 import os
-from glob import glob
-import cv2
+
+import numpy as np
 from tqdm import tqdm
+
+from camera_chess.classifier import Classifier
+from camera_chess.constants import CORNERS
+from camera_chess.state import State
+from camera_chess.video import Video
 
 
 def main():
-    target_fps = 4
-    for path in tqdm(glob(os.path.join('data', 'youtube', 'videos', '*'))):
-        if os.path.basename(path) != 'It_s_Blitz_says_Hikaru_Nakamura_after_his_game_against_Nihal_Sarin_World_Blitz_2022.webm':
+    start = 81
+    end = 428
+    video_path = 'data/youtube/Dubov_s_Phenomenal_opening_preparation_leaves_Nepomniachtchi_clueless_World_Blitz_2022.webm'
+    keypoints = np.array([[493, 882], [759, 619], [1263, 685], [1150, 1005]], dtype=np.float32)
+    video = Video(video_path, keypoints, start, end, target_fps=1)
+
+    keypoints_template = {'original_width': video.width,
+                          'original_height': video.height,
+                          'from_name': 'kp-1',
+                          'to_name': 'img-1',
+                          'type': 'keypointlabels'}
+    keypoints_labels = []
+    for (x, y), square in zip(video.new_keypoints, CORNERS):
+        keypoints_label = keypoints_template.copy()
+        keypoints_label['value'] = {'x': 100 * x / video.width,
+                                    'y': 100 * y / video.height,
+                                    'width': 1.0,
+                                    'keypointlabels': [square]}
+        keypoints_labels.append(keypoints_label)
+
+    classifier = Classifier(model_path='data/480M.onnx',
+                            conf_thres=0.1,
+                            keypoints=video.new_keypoints)
+    state = State(video.new_keypoints)
+    os.makedirs(os.path.join('label_studio', 'files', 'images'))
+    os.makedirs(os.path.join('label_studio', 'files', 'yolo'))
+    for image, frame in tqdm(video):
+        pred = classifier.run(image)
+        state.update(pred)
+        if not state.change:
             continue
-        print(path)
-        frames_dir = os.path.join('data', 'youtube', 'frames',
-                                  os.path.splitext(os.path.basename(path))[0])
-        os.makedirs(frames_dir, exist_ok=True)
-        cap = cv2.VideoCapture(path)
-        fps = round(cap.get(cv2.CAP_PROP_FPS))
-        mod = int(round(fps / target_fps))
-        print(mod)
 
-        i = 0
-        while True:
-            success = cap.grab()
-            if not success:
-                break
+        new_image_path = os.path.join('label_studio', 'files', 'images', f'{frame}.jpg')
+        image.save(new_image_path)
 
-            if i % mod == 0:
-                _, image = cap.retrieve()
-                cv2.imwrite(os.path.join(frames_dir, f'{i}.jpg'), image)
-            i += 1
+        d = {'data': {'img': f'/data/local-files/?d=images/{frame}.jpg'},
+             'annotations': [{
+                 'result': keypoints_labels.copy()
+             }]}
+
+        labels_template = {'original_width': video.width,
+                           'original_height': video.height,
+                           'from_name': 'bbox-1',
+                           'to_name': 'img-1',
+                           'type': 'rectanglelabels'}
+        for p in pred:
+            x = 100 * p.bbox[0] / video.width
+            y = 100 * p.bbox[1] / video.height
+            w = 100 * (p.bbox[2] - p.bbox[0]) / video.width
+            h = 100 * (p.bbox[3] - p.bbox[1]) / video.height
+            label = labels_template.copy()
+            label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [p.piece]}
+            d['annotations'][0]['result'].append(label)
+
+        with open(os.path.join('label_studio', 'files', 'yolo', f'{frame}.json'), 'w') as f:
+            json.dump(d, f, indent=4)
 
 
 if __name__ == '__main__':

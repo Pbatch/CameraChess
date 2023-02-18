@@ -14,6 +14,8 @@ class Video:
         self.target_fps = target_fps
 
         self.roi = self._get_roi()
+        self.width = float(self.roi[2] - self.roi[0])
+        self.height = float(self.roi[3] - self.roi[1])
         self.new_keypoints = self.keypoints - np.array([self.roi[0], self.roi[1]])
 
     def _get_roi(self):
@@ -38,15 +40,15 @@ class Video:
         start_frame = self.start * fps if self.start is not None else 0
         end_frame = self.end * fps if self.end is not None else float('inf')
         mod = int(round(fps / self.target_fps))
-        i = 0
+        frame = 0
         while True:
             success = cap.grab()
             if not success:
                 break
 
-            if i % mod == 0 and start_frame <= i <= end_frame:
+            if frame % mod == 0 and start_frame <= frame <= end_frame:
                 _, image = cap.retrieve()
                 image = Image.fromarray(image[..., ::-1]).convert('RGB')
                 image = image.crop(self.roi)
-                yield image
-            i += 1
+                yield image, frame
+            frame += 1
