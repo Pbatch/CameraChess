@@ -11,11 +11,7 @@ from camera_chess.video import Video
 
 
 def main():
-    start = 81
-    end = 428
-    video_path = 'data/youtube/Dubov_s_Phenomenal_opening_preparation_leaves_Nepomniachtchi_clueless_World_Blitz_2022.webm'
-    keypoints = np.array([[493, 882], [759, 619], [1263, 685], [1150, 1005]], dtype=np.float32)
-    video = Video(video_path, keypoints, start, end, target_fps=1)
+    video = Video('carlsen_vidit', target_fps=1)
 
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
@@ -31,7 +27,7 @@ def main():
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    classifier = Classifier(model_path='data/480M.onnx',
+    classifier = Classifier(model_path='data/480S.onnx',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)
     state = State(video.new_keypoints)

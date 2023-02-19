@@ -10,7 +10,7 @@ from camera_chess.visualizer import Visualizer
 def get_board(image, keypoints):
     keypoints = np.array(ast.literal_eval(keypoints),
                          dtype=np.float32)
-    classifier = Classifier('data/best.onnx',
+    classifier = Classifier('data/480S.onnx',
                             keypoints=keypoints)
     visualizer = Visualizer()
     pred = classifier.run(image)
@@ -21,7 +21,8 @@ def get_board(image, keypoints):
 def main():
     inputs = [gr.Image(type="pil"), gr.Text()]
     outputs = gr.Image(type="pil")
-    examples = [['data/hikaru/crops/1905.jpg', "[[177, 476], [16, 171], [574, 73], [884, 318]]"]]
+
+    examples = [['data/hikaru_sarin/images/19.jpg', "[[177, 476], [16, 171], [574, 73], [884, 318]]"]]
     demo = gr.Interface(fn=get_board,
                         inputs=inputs,
                         outputs=outputs,

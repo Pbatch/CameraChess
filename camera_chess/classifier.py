@@ -2,10 +2,8 @@ from collections import namedtuple
 
 import cv2
 import numpy as np
-import onnxruntime
-from PIL import Image
+from openvino.runtime import Core
 from scipy.spatial import KDTree
-from shapely.geometry import Polygon
 
 from camera_chess.constants import CLASSES, BOARD_SIZE, SQUARE_SIZE
 from camera_chess.utils import get_square
@@ -19,13 +17,21 @@ class Classifier:
         self.keypoints = keypoints
         self.conf_thres = conf_thres
 
-        self.sess = onnxruntime.InferenceSession(self.model_path)
-        self.output_name = self.sess.get_outputs()[0].name
-        self.input_name = self.sess.get_inputs()[0].name
-        self.onnx_height, self.onnx_width = self.sess.get_inputs()[0].shape[-2:]
         self.square_centers = self._get_square_centers()
         self.kd_tree = KDTree(self.square_centers)
-        self.roi = Polygon(self.keypoints)
+
+        ie = Core()
+        model = ie.read_model(model="models/480S.xml")
+        # model = ie.read_model(
+        #     model="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.xml",
+        #     weights="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.bin"
+        # )
+        self.compiled_model = ie.compile_model(model=model, device_name="CPU")
+        self.input_layer_ir = self.compiled_model.input(0)
+        self.output_layer_ir = self.compiled_model.output(0)
+        self.vino_height, self.vino_width = [int(i) for i in self.input_layer_ir.shape.to_string()[1:-1].split(',')[2:]]
+
+        self.ltrb = np.min(keypoints[:, 0]), np.min(keypoints[:, 1]), np.max(keypoints[:, 0]), np.max(keypoints[:, 1])
 
     @staticmethod
     def _zero_king_scores(pred):
@@ -57,21 +63,21 @@ class Classifier:
         return square_centers
 
     def _preprocess_image(self, image):
-        image = image.resize((self.onnx_width, self.onnx_height), Image.BICUBIC)
-        image = np.array(image, dtype=np.float32)
+        image = cv2.resize(image, (self.vino_width, self.vino_height), interpolation=cv2.INTER_CUBIC)
         image = np.expand_dims(image.transpose(2, 0, 1), axis=0)
         image = image / 255
+        image = image.astype(np.float16)
         return image
 
     def _run_od(self, np_image, width, height):
-        pred = self.sess.run([self.output_name], {self.input_name: np_image})[0][0]
+        pred = self.compiled_model([np_image])[self.output_layer_ir][0]
         pred = pred.transpose((1, 0))
         pred[:, 0] -= pred[:, 2] / 2
         pred[:, 1] -= pred[:, 3] / 2
         pred[:, 2] += pred[:, 0]
         pred[:, 3] += pred[:, 1]
-        pred[:, [0, 2]] *= width / self.onnx_width
-        pred[:, [1, 3]] *= height / self.onnx_height
+        pred[:, [0, 2]] *= width / self.vino_width
+        pred[:, [1, 3]] *= height / self.vino_height
         return pred
 
     def _filter_by_confidence(self, pred):
@@ -83,14 +89,17 @@ class Classifier:
         return pred
 
     def _filter_by_roi(self, pred):
-        pred = np.array([p
-                         for p in pred
-                         if Polygon([(p[0], p[1]), (p[0], p[3]), (p[2], p[3]), (p[2], p[1])]).intersects(self.roi)])
-        return pred
-
-    def _filter_by_square(self, pred):
         piece_centers = np.vstack([(pred[:, 0] + pred[:, 2]) / 2,
                                    pred[:, 3] - ((pred[:, 2] - pred[:, 0]) / 4)]).T
+        mask = self.ltrb[0] <= piece_centers[:, 0]
+        mask &= piece_centers[:, 0] <= self.ltrb[2]
+        mask &= self.ltrb[1] <= piece_centers[:, 1]
+        mask &= piece_centers[:, 1] <= self.ltrb[3]
+        pred = pred[mask]
+        piece_centers = piece_centers[mask]
+        return pred, piece_centers
+
+    def _filter_by_square(self, pred, piece_centers):
         distances, idxs = self.kd_tree.query(piece_centers)
         matches = {}
         for i in range(len(piece_centers)):
@@ -108,8 +117,8 @@ class Classifier:
 
     def _post_process_pred(self, pred):
         pred = self._filter_by_confidence(pred)
-        pred = self._filter_by_roi(pred)
-        pred, piece_centers, squares = self._filter_by_square(pred)
+        pred, piece_centers = self._filter_by_roi(pred)
+        pred, piece_centers, squares = self._filter_by_square(pred, piece_centers)
         pred = self._zero_king_scores(pred)
         pred = self._zero_pawn_scores(pred, squares)
 
@@ -124,7 +133,8 @@ class Classifier:
         return clean_pred
 
     def run(self, image):
+        original_height, original_width = image.shape[:2]
         np_image = self._preprocess_image(image)
-        pred = self._run_od(np_image, image.width, image.height)
+        pred = self._run_od(np_image, original_width, original_height)
         pred = self._post_process_pred(pred)
         return pred

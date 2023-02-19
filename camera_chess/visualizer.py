@@ -1,7 +1,9 @@
 import os
 from glob import glob
 
+import cv2
 from PIL import ImageDraw, ImageFont, Image
+import imagesize
 
 from camera_chess.constants import COLOUR_MAP
 
@@ -60,3 +62,15 @@ class Visualizer:
                        optimize=False,
                        duration=1000,
                        loop=0)
+
+    def create_video(self, image_dir, fps, save_name='replay'):
+        image_paths = sorted(glob(os.path.join(image_dir, '*.jpg')),
+                             key=lambda x: int(os.path.basename(x).replace('.jpg', '')))
+        width, height = imagesize.get(image_paths[0])
+
+        video = cv2.VideoWriter(f'{save_name}.avi', 0, fps, (width, height))
+        for p in image_paths:
+            video.write(cv2.imread(p))
+
+        cv2.destroyAllWindows()
+        video.release()
