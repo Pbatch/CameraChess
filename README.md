@@ -4,6 +4,7 @@
 
 * Add logic to restrict piece amounts by what is currently on the board
 * Add logic to deal with in-progress moves
+* Explore proper quantization
 * Label more video data
 
 ## Links

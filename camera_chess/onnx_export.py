@@ -4,18 +4,18 @@ from ultralytics import YOLO
 import subprocess
 
 
-def pt_to_onnx(pt_path):
+def pt_to_onnx(pt_path, size):
     model = YOLO(pt_path)
     model.export(format='onnx',
-                 imgsz=480,
+                 imgsz=size,
                  simplify=True,
                  half=True)
 
 
-def quantize(onnx_path):
+def quantize(onnx_path, size):
     subprocess.call(['mo',
                      '--input_model', onnx_path,
-                     '--input_shape', '[1,3,480,480]',
+                     '--input_shape', f'[1,3,{size},{size}]',
                      '--data_type', 'FP16',
                      '--output_dir', 'models/'])
     subprocess.call(["pot",
@@ -29,10 +29,11 @@ def quantize(onnx_path):
 
 def main():
     pt_path = 'models/480S.pt'
-    pt_to_onnx(pt_path)
-
     onnx_path = 'models/480S.onnx'
-    quantize(onnx_path)
+    size = 480
+
+    pt_to_onnx(pt_path, size)
+    quantize(onnx_path, size)
 
 
 if __name__ == '__main__':
