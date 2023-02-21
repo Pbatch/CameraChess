@@ -28,6 +28,9 @@ def quantize(onnx_path):
 
 
 def main():
+    pt_path = 'models/480S.pt'
+    pt_to_onnx(pt_path)
+
     onnx_path = 'models/480S.onnx'
     quantize(onnx_path)
 

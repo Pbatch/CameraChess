@@ -21,7 +21,7 @@ class Classifier:
         self.kd_tree = KDTree(self.square_centers)
 
         ie = Core()
-        model = ie.read_model(model="models/480S.xml")
+        model = ie.read_model(model=self.model_path)
         # model = ie.read_model(
         #     model="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.xml",
         #     weights="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.bin"
@@ -133,6 +133,7 @@ class Classifier:
         return clean_pred
 
     def run(self, image):
+        image = np.array(image)
         original_height, original_width = image.shape[:2]
         np_image = self._preprocess_image(image)
         pred = self._run_od(np_image, original_width, original_height)

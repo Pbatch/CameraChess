@@ -1,7 +1,6 @@
 data
 label_studio
 sparseml
-models
 positions
 .idea/
 **/__pycache__/

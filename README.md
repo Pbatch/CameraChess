@@ -2,10 +2,8 @@
 
 ## TODO
 
-* Merge colours in State
 * Add logic to restrict piece amounts by what is currently on the board
 * Add logic to deal with in-progress moves
-* Special logic for castling
 * Label more video data
 
 ## Links

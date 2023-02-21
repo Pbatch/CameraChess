@@ -5,7 +5,7 @@ def main():
     subprocess.call(['yt-dlp',
                      '-f', 'bv',
                      '-o', 'data/youtube/%(title)s.%(ext)s',
-                     '-a', 'data/youtube/urls.txt',
+                     '-a', 'data/video_urls.txt',
                      '--restrict-filenames'])
 
 

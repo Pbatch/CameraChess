@@ -5,8 +5,8 @@ from PIL import Image
 
 
 def main():
-    export_id = 'project-1-at-2023-02-18-16-19-56140b82'
-    dataset = 'carlsen_vidit'
+    export_id = 'project-1-at-2023-02-20-23-57-3551aecc'
+    dataset = 'carlsen_toma'
     with open(os.path.join(f'label_studio/data/export/{export_id}.json')) as f:
         labels = json.load(f)
 

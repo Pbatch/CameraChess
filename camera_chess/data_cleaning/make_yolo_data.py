@@ -22,7 +22,7 @@ def main(image_size, train_fraction, max_split_size):
             os.makedirs(p)
 
     datasets = ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5',
-                'hikaru_sarin', 'dubov_nepo', 'chesscog']
+                'hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'chesscog']
     for dataset in datasets:
         label_paths = list(glob(os.path.join('data', dataset, 'labels', '*')))
         if len(label_paths) > max_split_size:

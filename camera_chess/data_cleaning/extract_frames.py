@@ -1,17 +1,20 @@
 import json
 import os
 
-import numpy as np
+from PIL import Image
 from tqdm import tqdm
 
 from camera_chess.classifier import Classifier
 from camera_chess.constants import CORNERS
 from camera_chess.state import State
+from camera_chess.utils import load_video_config
 from camera_chess.video import Video
 
 
 def main():
-    video = Video('carlsen_vidit', target_fps=1)
+    dataset = 'carlsen_toma'
+    video_config = load_video_config(dataset)
+    video = Video(video_config, target_fps=4)
 
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
@@ -27,7 +30,7 @@ def main():
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    classifier = Classifier(model_path='data/480S.onnx',
+    classifier = Classifier(model_path='models/480S.xml',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)
     state = State(video.new_keypoints)
@@ -40,7 +43,7 @@ def main():
             continue
 
         new_image_path = os.path.join('label_studio', 'files', 'images', f'{frame}.jpg')
-        image.save(new_image_path)
+        Image.fromarray(image).save(new_image_path)
 
         d = {'data': {'img': f'/data/local-files/?d=images/{frame}.jpg'},
              'annotations': [{
