@@ -3,7 +3,7 @@ import os
 import cv2
 import numpy as np
 from decord import VideoReader
-
+from PIL import Image
 from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE
 
 
@@ -22,6 +22,7 @@ class Video:
         self.mod = int(round(self.fps / self.target_fps))
 
         self.roi = self._get_roi()
+        self.l, self.t, self.r, self.b = [int(i) for i in self.roi]
         self.width = float(self.roi[2] - self.roi[0])
         self.height = float(self.roi[3] - self.roi[1])
         self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]])
@@ -47,6 +48,9 @@ class Video:
                   if (self.start_frame <= i <= self.end_frame) and i % self.mod == 0]
         for frame in frames:
             image = self.vr[frame].asnumpy()
-            l, t, r, b = [int(i) for i in self.roi]
-            image = image[t:b, l:r]
+            image = image[self.t:self.b, self.l:self.r]
             yield image, frame
+
+    def save_start_image(self):
+        image = self.vr[int(self.start_frame)].asnumpy()
+        Image.fromarray(image).save('start_image.jpg')

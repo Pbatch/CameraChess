@@ -53,11 +53,12 @@ class Action:
 
 
 class State:
-    def __init__(self, keypoints, min_hits=2):
+    def __init__(self, keypoints, fen, min_hits=2):
         self.keypoints = keypoints
+        self.fen = fen
         self.min_hits = min_hits
 
-        self.board = chess.Board()
+        self.board = chess.Board(fen=self.fen)
         self.game = chess.pgn.Game()
         self.node = self.game
         self.change = False

@@ -12,18 +12,19 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'hikaru_vasif'
+    dataset = 'hikaru_sarin'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=8)
+    video = Video(video_config, target_fps=1)
     classifier = Classifier(model_path='models/480S.xml',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)
     visualizer = Visualizer()
     state = State(video.new_keypoints,
+                  video_config.fen,
                   min_hits=2)
-    if os.path.isdir('positions'):
-        shutil.rmtree('positions')
-    os.makedirs('positions')
+    if os.path.isdir('debug'):
+        shutil.rmtree('debug')
+    os.makedirs('debug')
 
     correct = 0
     with tqdm(total=len(video_config.moves)) as pbar:
@@ -34,7 +35,7 @@ def main():
                 image = Image.fromarray(image)
                 image = visualizer.add_bboxes(image, pred)
                 image = visualizer.add_board(image, state)
-                image.save(os.path.join('positions', f'{frame}.jpg'))
+                image.save(os.path.join('debug', f'{frame}.jpg'))
                 move_no = state.board.ply() - 1
                 pred_move = state.last_move
                 gt_move = video_config.moves[move_no]
@@ -46,7 +47,7 @@ def main():
                     state.debug(gt_move, pred)
                     break
                 pbar.update(1)
-    visualizer.create_video('positions', fps=video.target_fps)
+    visualizer.create_video('debug', fps=video.target_fps)
     print(f'{correct}/{len(video_config.moves)} moves were tracked correctly')
 
 

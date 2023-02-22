@@ -5,6 +5,8 @@
 * Add logic to restrict piece amounts by what is currently on the board
 * Add logic to deal with in-progress moves
 * Explore proper quantization
+* Investigate blender script from Chesscog
+* Look at using FEN + occupancy detection + classifier to label data 
 * Label more video data
 
 ## Links

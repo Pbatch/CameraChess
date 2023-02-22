@@ -5,7 +5,7 @@ import chess.pgn
 import numpy as np
 import yaml
 
-video_config = namedtuple("VideoConfig", "start end path keypoints moves")
+video_config = namedtuple("VideoConfig", "start end path keypoints fen moves")
 
 
 def get_square(idx):

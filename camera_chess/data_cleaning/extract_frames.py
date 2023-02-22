@@ -12,9 +12,9 @@ from camera_chess.video import Video
 
 
 def main():
-    dataset = 'carlsen_toma'
+    dataset = 'carlsen_abdu'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=4)
+    video = Video(video_config, target_fps=8)
 
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
