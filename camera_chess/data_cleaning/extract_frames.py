@@ -1,21 +1,31 @@
 import json
 import os
+import shutil
 
+import chess
+import chess.pgn
 from PIL import Image
 from tqdm import tqdm
 
 from camera_chess.classifier import Classifier
-from camera_chess.constants import CORNERS
-from camera_chess.state import State
+from camera_chess.constants import CORNERS, PIECE_TO_CLASS
 from camera_chess.utils import load_video_config
 from camera_chess.video import Video
 
 
 def main():
-    dataset = 'carlsen_abdu'
-    video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=8)
+    image_dir = os.path.join('label_studio', 'files', 'images')
+    yolo_dir = os.path.join('label_studio', 'files', 'yolo')
+    if os.path.isdir(image_dir):
+        shutil.rmtree(image_dir)
+    if os.path.isdir(yolo_dir):
+        shutil.rmtree(yolo_dir)
+    os.makedirs(image_dir)
+    os.makedirs(yolo_dir)
 
+    dataset = 'shimanov_vidit'
+    video_config = load_video_config(dataset)
+    video = Video(video_config, target_fps=4)
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
                           'from_name': 'kp-1',
@@ -33,16 +43,23 @@ def main():
     classifier = Classifier(model_path='models/480S.xml',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)
-    state = State(video.new_keypoints)
-    os.makedirs(os.path.join('label_studio', 'files', 'images'))
-    os.makedirs(os.path.join('label_studio', 'files', 'yolo'))
+    board = chess.Board(fen=video_config.fen)
+
+    move_idx = 0
     for image, frame in tqdm(video):
         pred = classifier.run(image)
-        state.update(pred)
-        if not state.change:
+
+        pred_occupied = {p.square for p in pred}
+        move = video_config.moves[move_idx]
+        from_square = move[:2]
+        to_square = move[2:]
+        if from_square in pred_occupied or to_square not in pred_occupied:
             continue
 
-        new_image_path = os.path.join('label_studio', 'files', 'images', f'{frame}.jpg')
+        move_idx += 1
+        board.push(chess.Move.from_uci(move))
+
+        new_image_path = os.path.join(image_dir, f'{frame}.jpg')
         Image.fromarray(image).save(new_image_path)
 
         d = {'data': {'img': f'/data/local-files/?d=images/{frame}.jpg'},
@@ -61,10 +78,18 @@ def main():
             w = 100 * (p.bbox[2] - p.bbox[0]) / video.width
             h = 100 * (p.bbox[3] - p.bbox[1]) / video.height
             label = labels_template.copy()
-            label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [p.piece]}
+
+            # Use the board to overwrite the piece classification
+            square = chess.parse_square(p.square)
+            piece = board.piece_at(square)
+            if piece is None:
+                continue
+            piece = PIECE_TO_CLASS[piece]
+
+            label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [piece]}
             d['annotations'][0]['result'].append(label)
 
-        with open(os.path.join('label_studio', 'files', 'yolo', f'{frame}.json'), 'w') as f:
+        with open(os.path.join(yolo_dir, f'{frame}.json'), 'w') as f:
             json.dump(d, f, indent=4)
 
 

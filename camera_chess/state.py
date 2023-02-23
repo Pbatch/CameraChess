@@ -62,6 +62,7 @@ class State:
         self.game = chess.pgn.Game()
         self.node = self.game
         self.change = False
+        self.last_move = None
         self.actions = []
 
         self._reset_actions()

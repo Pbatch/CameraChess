@@ -12,9 +12,9 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'hikaru_sarin'
+    dataset = 'shimanov_vidit'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=1)
+    video = Video(video_config, target_fps=4)
     classifier = Classifier(model_path='models/480S.xml',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)

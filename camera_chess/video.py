@@ -26,6 +26,9 @@ class Video:
         self.width = float(self.roi[2] - self.roi[0])
         self.height = float(self.roi[3] - self.roi[1])
         self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]])
+        self.frames = [i for i in range(len(self.vr))
+                       if (self.start_frame <= i <= self.end_frame)
+                       and i % self.mod == 0]
 
     def _get_roi(self):
         target = np.array([[BOARD_SIZE, BOARD_SIZE],
@@ -37,20 +40,23 @@ class Video:
         warped_extremities = np.array([[[-1, -1], [9, -1], [9, 9], [-1, 9]]], dtype=np.float32) * SQUARE_SIZE
         extremities = cv2.perspectiveTransform(warped_extremities, inv_matrix)[0]
 
-        roi = [np.min(extremities[:, 0]),
-               np.min(extremities[:, 1]),
-               np.max(extremities[:, 0]),
-               np.max(extremities[:, 1])]
+        height, width = self.vr[0].asnumpy().shape[:2]
+
+        roi = [max(np.min(extremities[:, 0]), 0),
+               max(np.min(extremities[:, 1]), 0),
+               min(np.max(extremities[:, 0]), width),
+               min(np.max(extremities[:, 1]), height)]
         return roi
 
     def __iter__(self):
-        frames = [i for i in range(len(self.vr))
-                  if (self.start_frame <= i <= self.end_frame) and i % self.mod == 0]
-        for frame in frames:
+        for frame in self.frames:
             image = self.vr[frame].asnumpy()
             image = image[self.t:self.b, self.l:self.r]
             yield image, frame
 
+    def __len__(self):
+        return len(self.frames)
+
     def save_start_image(self):
-        image = self.vr[int(self.start_frame)].asnumpy()
+        image = self.vr[self.frames[0]].asnumpy()
         Image.fromarray(image).save('start_image.jpg')
