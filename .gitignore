@@ -1,6 +1,6 @@
 data
 label_studio
 sparseml
-positions
+debug
 .idea/
 **/__pycache__/

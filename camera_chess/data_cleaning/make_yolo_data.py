@@ -1,30 +1,31 @@
 import argparse
 import json
 import os
-import shutil
-import subprocess
 import random
+import subprocess
 from glob import glob
 
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import ROOT_DIR, CLASSES
+from camera_chess.constants import CLASSES, DATA_DIR, YOLO_DIR
+from camera_chess.utils import clear_dir
 
 
 def main(image_size, train_fraction, max_split_size):
     for split in ['train', 'val']:
         for i in ['images', 'labels']:
-            p = os.path.join('data', 'yolo', split, i)
-            if os.path.isdir(p):
-                shutil.rmtree(p)
-            os.makedirs(p)
+            clear_dir(os.path.join(YOLO_DIR, split, i))
 
-    datasets = ['google', 'roboflow_1', 'roboflow_2', 'roboflow_3', 'roboflow_4', 'roboflow_5',
-                'hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'chesscog']
+    youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
+                        'shimanov_vidit']
+    roboflow_datasets = ['1', '2', '3', '4', '5']
+    datasets = ['google', 'chesscog']
+    datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
+    datasets.extend([os.path.join('roboflow', s) for s in roboflow_datasets])
     for dataset in datasets:
-        label_paths = list(glob(os.path.join('data', dataset, 'labels', '*')))
+        label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
         if len(label_paths) > max_split_size:
             label_paths = random.sample(label_paths, max_split_size)
         for label_path in tqdm(label_paths, desc=dataset):
@@ -61,8 +62,8 @@ def main(image_size, train_fraction, max_split_size):
             crop_width, crop_height = crop.width, crop.height
             crop = crop.resize((image_size, image_size))
             split = "train" if np.random.random() < train_fraction else "val"
-            id_ = f'{dataset}_{os.path.splitext(os.path.basename(image_path))[0]}'
-            new_image_path = os.path.join('data', 'yolo', split, 'images', f'{id_}.jpg')
+            id_ = f'{dataset.replace(os.path.sep, "_")}_{os.path.splitext(os.path.basename(image_path))[0]}'
+            new_image_path = os.path.join(YOLO_DIR, split, 'images', f'{id_}.jpg')
             crop.save(new_image_path)
 
             output = []
@@ -73,10 +74,10 @@ def main(image_size, train_fraction, max_split_size):
                 w = bbox[2] / crop_width
                 h = bbox[3] / crop_height
                 output.append(f'{class_id} {xc} {yc} {w} {h}')
-            new_label_path = os.path.join('data', 'yolo', split, 'labels', f'{id_}.txt')
+            new_label_path = os.path.join(YOLO_DIR, split, 'labels', f'{id_}.txt')
             with open(new_label_path, 'w') as f:
                 f.write('\n'.join(output))
-    subprocess.call(['tar', '-czf', 'yolo.tar.gz', 'yolo'], cwd=os.path.join(ROOT_DIR, 'data'))
+    subprocess.call(['tar', '-czf', 'yolo.tar.gz', 'yolo'], cwd=DATA_DIR)
 
 
 if __name__ == '__main__':

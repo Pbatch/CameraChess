@@ -1,9 +1,12 @@
 import os
+import shutil
 from collections import namedtuple
 
 import chess.pgn
 import numpy as np
 import yaml
+
+from camera_chess.constants import DATA_DIR
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves")
 
@@ -15,9 +18,9 @@ def get_square(idx):
 
 
 def load_video_config(dataset):
-    dataset_dir = os.path.join('data', dataset)
+    dataset_dir = os.path.join(DATA_DIR, dataset)
 
-    with open('data/video_config.yaml') as f:
+    with open(os.path.join(DATA_DIR, 'video_config.yaml')) as f:
         config = yaml.safe_load(f)
     dataset_config = config[dataset]
 
@@ -35,3 +38,10 @@ def load_moves_from_pgn(path):
         game = chess.pgn.read_game(f)
     moves = [str(move) for move in game.mainline_moves()]
     return moves
+
+
+def clear_dir(d):
+    if os.path.isdir(d):
+        shutil.rmtree(d)
+    os.makedirs(d)
+

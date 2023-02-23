@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 
 import chess
 import chess.pgn
@@ -8,20 +7,14 @@ from PIL import Image
 from tqdm import tqdm
 
 from camera_chess.classifier import Classifier
-from camera_chess.constants import CORNERS, PIECE_TO_CLASS
-from camera_chess.utils import load_video_config
+from camera_chess.constants import CORNERS, PIECE_TO_CLASS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR
+from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.video import Video
 
 
 def main():
-    image_dir = os.path.join('label_studio', 'files', 'images')
-    yolo_dir = os.path.join('label_studio', 'files', 'yolo')
-    if os.path.isdir(image_dir):
-        shutil.rmtree(image_dir)
-    if os.path.isdir(yolo_dir):
-        shutil.rmtree(yolo_dir)
-    os.makedirs(image_dir)
-    os.makedirs(yolo_dir)
+    clear_dir(STUDIO_IMAGE_DIR)
+    clear_dir(STUDIO_LABEL_DIR)
 
     dataset = 'shimanov_vidit'
     video_config = load_video_config(dataset)
@@ -59,7 +52,7 @@ def main():
         move_idx += 1
         board.push(chess.Move.from_uci(move))
 
-        new_image_path = os.path.join(image_dir, f'{frame}.jpg')
+        new_image_path = os.path.join(STUDIO_IMAGE_DIR, f'{frame}.jpg')
         Image.fromarray(image).save(new_image_path)
 
         d = {'data': {'img': f'/data/local-files/?d=images/{frame}.jpg'},
@@ -89,7 +82,7 @@ def main():
             label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [piece]}
             d['annotations'][0]['result'].append(label)
 
-        with open(os.path.join(yolo_dir, f'{frame}.json'), 'w') as f:
+        with open(os.path.join(STUDIO_LABEL_DIR, f'{frame}.json'), 'w') as f:
             json.dump(d, f, indent=4)
 
 
