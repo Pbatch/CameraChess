@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import CORNERS
+from camera_chess.constants import CORNERS, DATA_DIR
 
 
 def main():
@@ -26,12 +26,12 @@ def main():
     for i, old_label_path in tqdm(enumerate(sorted(glob('data/chesscog/raw/*/*.json')))):
         old_image_path = old_label_path.replace('.json', '.png')
 
-        new_image_path = os.path.join('data', 'chesscog', 'images', f'{i}.jpg')
+        new_image_path = os.path.join(DATA_DIR, 'chesscog', 'images', f'{i}.jpg')
         image = Image.open(old_image_path).convert('RGB')
         width, height = image.width, image.height
         image.save(new_image_path)
 
-        new_label_path = os.path.join('data', 'chesscog', 'labels', f'{i}.json')
+        new_label_path = os.path.join(DATA_DIR, 'chesscog', 'labels', f'{i}.json')
         with open(old_label_path) as f:
             d = json.load(f)
         keypoints = {s: [c[0] / width, c[1] / height]

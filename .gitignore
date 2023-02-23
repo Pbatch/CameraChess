@@ -2,5 +2,6 @@ data
 label_studio
 sparseml
 debug
+blender
 .idea/
 **/__pycache__/

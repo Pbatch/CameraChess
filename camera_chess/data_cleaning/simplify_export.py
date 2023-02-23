@@ -3,6 +3,8 @@ import os
 
 from PIL import Image
 
+from camera_chess.constants import DATA_DIR
+
 
 def main():
     export_id = 'project-1-at-2023-02-23-02-25-8692b6fb'
@@ -10,8 +12,8 @@ def main():
     with open(os.path.join(f'label_studio/data/export/{export_id}.json')) as f:
         labels = json.load(f)
 
-    os.makedirs(os.path.join('data', dataset, 'labels'))
-    os.makedirs(os.path.join('data', dataset, 'images'))
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'))
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'images'))
     for i, label in enumerate(labels):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
