@@ -19,7 +19,7 @@ def main(image_size, train_fraction, max_split_size):
             clear_dir(os.path.join(YOLO_DIR, split, i))
 
     youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
-                        'shimanov_vidit']
+                        'shimanov_vidit', 'harika_nana', 'harika_mariam']
     roboflow_datasets = ['1', '2', '3', '4', '5']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])

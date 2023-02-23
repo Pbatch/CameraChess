@@ -3,10 +3,11 @@ import shutil
 from collections import namedtuple
 
 import chess.pgn
+import cv2
 import numpy as np
 import yaml
 
-from camera_chess.constants import DATA_DIR
+from camera_chess.constants import DATA_DIR, BOARD_SIZE
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves")
 
@@ -22,15 +23,19 @@ def load_video_config(dataset):
 
     with open(os.path.join(DATA_DIR, 'video_config.yaml')) as f:
         config = yaml.safe_load(f)
-    dataset_config = config[dataset]
+    d = config[dataset]
+    if 'fen' not in d:
+        # Starting position
+        d['fen'] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    video_config_ = video_config(start=d['start'],
+                                 end=d['end'],
+                                 url=d['url'],
+                                 path=os.path.join(dataset_dir, 'video.webm'),
+                                 keypoints=np.array(d['keypoints'], dtype=np.float32),
+                                 fen=d['fen'],
+                                 moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')))
 
-    dataset_config['keypoints'] = np.array(dataset_config['keypoints'], dtype=np.float32)
-    dataset_config['path'] = os.path.join(dataset_dir, dataset_config['path'])
-    pgn_path = os.path.join(dataset_dir, 'gt.pgn')
-    dataset_config['moves'] = load_moves_from_pgn(pgn_path)
-    dataset_config = video_config(*dataset_config.values())
-
-    return dataset_config
+    return video_config_
 
 
 def load_moves_from_pgn(path):
@@ -45,3 +50,13 @@ def clear_dir(d):
         shutil.rmtree(d)
     os.makedirs(d)
 
+
+def warp(src, keypoints):
+    target = np.array([[BOARD_SIZE, BOARD_SIZE],
+                       [0, BOARD_SIZE],
+                       [0, 0],
+                       [BOARD_SIZE, 0]], dtype=np.float32)
+    matrix = cv2.getPerspectiveTransform(keypoints, target)
+    inv_matrix = np.linalg.inv(matrix)
+    warped_src = cv2.perspectiveTransform(np.expand_dims(src, axis=0), inv_matrix)[0]
+    return warped_src

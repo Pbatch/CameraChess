@@ -11,9 +11,10 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'youtube/shimanov_vidit'
+    dataset = 'youtube/carlsen_abdu'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=4)
+    video.save_start_image()
     classifier = Classifier(model_path='models/480S.xml',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)

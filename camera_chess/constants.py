@@ -3,8 +3,8 @@ import chess
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STUDIO_DIR = os.path.join(ROOT_DIR, 'label_studio')
-STUDIO_IMAGE_DIR = os.path.join(STUDIO_DIR, 'files', 'labels')
-STUDIO_LABEL_DIR = os.path.join(STUDIO_DIR, 'files', 'images')
+STUDIO_IMAGE_DIR = os.path.join(STUDIO_DIR, 'files', 'images')
+STUDIO_LABEL_DIR = os.path.join(STUDIO_DIR, 'files', 'labels')
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 YOLO_DIR = os.path.join(DATA_DIR, 'yolo')
 

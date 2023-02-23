@@ -6,7 +6,7 @@ from openvino.runtime import Core
 from scipy.spatial import KDTree
 
 from camera_chess.constants import CLASSES, BOARD_SIZE, SQUARE_SIZE
-from camera_chess.utils import get_square
+from camera_chess.utils import get_square, warp
 
 classification = namedtuple("Classification", "bbox conf piece center square")
 
@@ -31,13 +31,14 @@ class Classifier:
         self.output_layer_ir = self.compiled_model.output(0)
         self.vino_height, self.vino_width = [int(i) for i in self.input_layer_ir.shape.to_string()[1:-1].split(',')[2:]]
 
-        self.ltrb = np.min(keypoints[:, 0]), np.min(keypoints[:, 1]), np.max(keypoints[:, 0]), np.max(keypoints[:, 1])
-
     @staticmethod
     def _zero_king_scores(pred):
         for piece in ['white-king', 'black-king']:
             idx = 4 + CLASSES.index(piece)
-            best_idx = pred[4:, idx].argmax()
+            try:
+                best_idx = pred[4:, idx].argmax()
+            except ValueError:
+                continue
             best_score = pred[4 + best_idx, idx]
             pred[:, idx] = 0
             pred[4 + best_idx, idx] = best_score
@@ -52,14 +53,8 @@ class Classifier:
         return pred
 
     def _get_square_centers(self):
-        target = np.array([[BOARD_SIZE, BOARD_SIZE],
-                           [0, BOARD_SIZE],
-                           [0, 0],
-                           [BOARD_SIZE, 0]], dtype=np.float32)
-        matrix = cv2.getPerspectiveTransform(self.keypoints, target)
-        inv_matrix = np.linalg.inv(matrix)
         grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * SQUARE_SIZE
-        square_centers = cv2.perspectiveTransform(np.expand_dims(grid, axis=0), inv_matrix)[0]
+        square_centers = warp(grid, self.keypoints)
         return square_centers
 
     def _preprocess_image(self, image):
@@ -91,10 +86,12 @@ class Classifier:
     def _filter_by_roi(self, pred):
         piece_centers = np.vstack([(pred[:, 0] + pred[:, 2]) / 2,
                                    pred[:, 3] - ((pred[:, 2] - pred[:, 0]) / 4)]).T
-        mask = self.ltrb[0] <= piece_centers[:, 0]
-        mask &= piece_centers[:, 0] <= self.ltrb[2]
-        mask &= self.ltrb[1] <= piece_centers[:, 1]
-        mask &= piece_centers[:, 1] <= self.ltrb[3]
+        mask = np.ones(len(piece_centers), dtype=bool)
+        for i in range(4):
+            v1 = self.keypoints[i-1] - self.keypoints[i]
+            v2 = piece_centers - self.keypoints[i]
+            cross_products = np.cross(v1, v2)
+            mask &= cross_products < 0
         pred = pred[mask]
         piece_centers = piece_centers[mask]
         return pred, piece_centers

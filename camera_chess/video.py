@@ -5,6 +5,7 @@ import numpy as np
 from decord import VideoReader
 from PIL import Image
 from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE
+from camera_chess.utils import warp
 
 
 class Video:
@@ -31,17 +32,10 @@ class Video:
                        and i % self.mod == 0]
 
     def _get_roi(self):
-        target = np.array([[BOARD_SIZE, BOARD_SIZE],
-                           [0, BOARD_SIZE],
-                           [0, 0],
-                           [BOARD_SIZE, 0]], dtype=np.float32)
-        matrix = cv2.getPerspectiveTransform(self.video_config.keypoints, target)
-        inv_matrix = np.linalg.inv(matrix)
-        warped_extremities = np.array([[[-1, -1], [9, -1], [9, 9], [-1, 9]]], dtype=np.float32) * SQUARE_SIZE
-        extremities = cv2.perspectiveTransform(warped_extremities, inv_matrix)[0]
+        border = np.array([[-2, -2], [10, -2], [10, 10], [-2, 10]], dtype=np.float32) * SQUARE_SIZE
+        extremities = warp(border, self.video_config.keypoints)
 
         height, width = self.vr[0].asnumpy().shape[:2]
-
         roi = [max(np.min(extremities[:, 0]), 0),
                max(np.min(extremities[:, 1]), 0),
                min(np.max(extremities[:, 0]), width),
