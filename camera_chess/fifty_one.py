@@ -4,14 +4,14 @@ from glob import glob
 
 import fiftyone as fo
 
-import constants
+from camera_chess.constants import DATA_DIR
 
 
 def load_label_studio():
     samples = []
     keypoint_order = ['h1', 'a1', 'a8', 'h8']
     for dataset in ['chesscog']:
-        for image_path in glob(os.path.join(constants.DATA_DIR, dataset, 'images', '*')):
+        for image_path in glob(os.path.join(DATA_DIR, dataset, 'images', '*')):
             sample = fo.Sample(filepath=image_path)
 
             label_path = image_path.replace('images', 'labels').replace('.jpg', '.json')
@@ -39,8 +39,8 @@ def load_yolo():
     dataset = fo.Dataset()
     for split in ['train', 'val']:
         dataset.add_dir(
-            dataset_dir=os.path.join(constants.ROOT_DIR, 'data/yolo'),
-            yaml_path=os.path.join(constants.ROOT_DIR, 'data/yolo/data.yaml'),
+            dataset_dir=os.path.join(DATA_DIR, 'yolo'),
+            yaml_path=os.path.join(DATA_DIR, 'yolo/data.yaml'),
             dataset_type=fo.types.YOLOv5Dataset,
             split=split,
             tags=split,

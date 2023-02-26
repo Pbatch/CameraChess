@@ -6,7 +6,7 @@ import chess.pgn
 import chess.svg
 from PIL import Image
 
-import constants
+from camera_chess.constants import PIECE_TO_CLASS
 
 
 class Action:
@@ -20,7 +20,7 @@ class Action:
         self.error = ''
         self.from_square = chess.SQUARE_NAMES[self.move.from_square]
         self.to_square = chess.SQUARE_NAMES[self.move.to_square]
-        self.piece = constants.PIECE_TO_CLASS[self.board.piece_at(self.move.from_square)]
+        self.piece = PIECE_TO_CLASS[self.board.piece_at(self.move.from_square)]
 
     def __repr__(self):
         return f'{self.move} {self.score} {self.error}'
@@ -98,7 +98,7 @@ class State:
         for square in chess.SQUARES:
             piece = self.board.piece_at(square)
             if piece is not None:
-                square_to_gt[chess.square_name(square)] = constants.PIECE_TO_CLASS[piece]
+                square_to_gt[chess.square_name(square)] = PIECE_TO_CLASS[piece]
 
         while True:
             for action in self.actions:
