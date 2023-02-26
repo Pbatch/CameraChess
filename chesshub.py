@@ -50,7 +50,7 @@ async def connectToChessHub(connectionId):
             keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']], dtype=np.float32)
             keypoints[..., 0] *= pil_image.width
             keypoints[..., 1] *= pil_image.height
-            classifier = Classifier(model_path='CameraChess/models/480S.xml',
+            classifier = Classifier(model_path='models/480S.xml',
                                     keypoints=keypoints,
                                     conf_thres=0.1)
             pred = classifier.run(pil_image)
