@@ -3,7 +3,7 @@ import os.path
 from ultralytics import YOLO
 import subprocess
 
-from camera_chess.constants import DATA_DIR
+from camera_chess import constants
 
 
 def pt_to_onnx(pt_path, size):
@@ -25,7 +25,7 @@ def quantize(onnx_path, size):
                      "-m", f'{os.path.splitext(onnx_path)[0]}.xml',
                      "-w", f'{os.path.splitext(onnx_path)[0]}.bin',
                      "--engine", "simplified",
-                     "--data-source", f"{DATA_DIR}/google/images",
+                     "--data-source", f"{constants.DATA_DIR}/google/images",
                      "--output-dir", "models/INT8"])
 
 

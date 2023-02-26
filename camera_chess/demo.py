@@ -5,14 +5,14 @@ from tqdm import tqdm
 
 from camera_chess.classifier import Classifier
 from camera_chess.state import State
-from camera_chess.utils import load_video_config, clear_dir
+from camera_chess import utils
 from camera_chess.video import Video
 from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'youtube/carlsen_abdu'
-    video_config = load_video_config(dataset)
+    dataset = 'youtube/anand_carlsen'
+    video_config = utils.load_video_config(dataset)
     video = Video(video_config, target_fps=4)
     video.save_start_image()
     classifier = Classifier(model_path='models/480S.xml',
@@ -22,7 +22,7 @@ def main():
     state = State(video.new_keypoints,
                   video_config.fen,
                   min_hits=2)
-    clear_dir('debug')
+    utils.clear_dir('debug')
 
     correct = 0
     with tqdm(total=len(video_config.moves)) as pbar:

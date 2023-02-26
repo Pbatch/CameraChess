@@ -6,7 +6,7 @@ import chess.pgn
 import chess.svg
 from PIL import Image
 
-from camera_chess.constants import PIECE_TO_CLASS
+from camera_chess import constants
 
 
 class Action:
@@ -20,12 +20,12 @@ class Action:
         self.error = ''
         self.from_square = chess.SQUARE_NAMES[self.move.from_square]
         self.to_square = chess.SQUARE_NAMES[self.move.to_square]
-        self.piece = PIECE_TO_CLASS[self.board.piece_at(self.move.from_square)]
+        self.piece = constants.PIECE_TO_CLASS[self.board.piece_at(self.move.from_square)]
 
     def __repr__(self):
         return f'{self.move} {self.score} {self.error}'
 
-    def update(self, square_to_pred):
+    def update(self, square_to_pred, square_to_gt):
         self.score = 0
         self.error = ''
         if self.from_square in square_to_pred:
@@ -36,10 +36,11 @@ class Action:
             self.error = f'Piece did not arrive at {self.to_square}'
             return
 
-        pred = square_to_pred[self.to_square]
-        if pred.piece != self.piece:
-            self.error = f'Wrong piece classification at {self.to_square} ({pred.piece} != {self.piece})'
-            return
+        if self.to_square in square_to_gt:
+            pred = square_to_pred[self.to_square]
+            if pred.piece != self.piece:
+                self.error = f'Wrong piece classification at {self.to_square} ({pred.piece} != {self.piece})'
+                return
 
         self.hits += 1
         if self.hits < self.min_hits:
@@ -93,10 +94,15 @@ class State:
         self.change = False
 
         square_to_pred = {p.square: p for p in pred}
+        square_to_gt = {}
+        for square in chess.SQUARES:
+            piece = self.board.piece_at(square)
+            if piece is not None:
+                square_to_gt[chess.square_name(square)] = constants.PIECE_TO_CLASS[piece]
 
         while True:
             for action in self.actions:
-                action.update(square_to_pred)
+                action.update(square_to_pred, square_to_gt)
 
             best_action = max(self.actions, key=lambda x: x.score)
             if best_action.score == 0:

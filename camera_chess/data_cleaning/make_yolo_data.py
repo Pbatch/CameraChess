@@ -19,7 +19,8 @@ def main(image_size, train_fraction, max_split_size):
             clear_dir(os.path.join(YOLO_DIR, split, i))
 
     youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
-                        'shimanov_vidit', 'harika_nana', 'harika_mariam']
+                        'shimanov_vidit', 'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
+                        'karayaman']
     roboflow_datasets = ['1', '2', '3', '4', '5']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
@@ -84,6 +85,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--image_size', type=int, default=480)
     parser.add_argument('-f', '--train_fraction', type=float, default=0.9)
-    parser.add_argument('-m', '--max_split_size', type=int, default=500)
+    parser.add_argument('-m', '--max_split_size', type=int, default=1000)
     args = parser.parse_args()
     main(args.image_size, args.train_fraction, args.max_split_size)

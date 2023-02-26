@@ -1,11 +1,9 @@
 import os
 
-import cv2
 import numpy as np
-from decord import VideoReader
 from PIL import Image
-from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE
-from camera_chess.utils import warp
+from decord import VideoReader
+from camera_chess import constants, utils
 
 
 class Video:
@@ -32,8 +30,8 @@ class Video:
                        and i % self.mod == 0]
 
     def _get_roi(self):
-        border = np.array([[-2, -2], [10, -2], [10, 10], [-2, 10]], dtype=np.float32) * SQUARE_SIZE
-        extremities = warp(border, self.video_config.keypoints)
+        border = np.array([[-2, -2], [10, -2], [10, 10], [-2, 10]], dtype=np.float32) * constants.SQUARE_SIZE
+        extremities = utils.warp(border, self.video_config.keypoints)
 
         height, width = self.vr[0].asnumpy().shape[:2]
         roi = [max(np.min(extremities[:, 0]), 0),

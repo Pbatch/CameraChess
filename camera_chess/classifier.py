@@ -5,8 +5,8 @@ import numpy as np
 from openvino.runtime import Core
 from scipy.spatial import KDTree
 
-from camera_chess.constants import CLASSES, BOARD_SIZE, SQUARE_SIZE
-from camera_chess.utils import get_square, warp
+from camera_chess import constants
+from camera_chess import utils
 
 classification = namedtuple("Classification", "bbox conf piece center square")
 
@@ -34,7 +34,7 @@ class Classifier:
     @staticmethod
     def _zero_king_scores(pred):
         for piece in ['white-king', 'black-king']:
-            idx = 4 + CLASSES.index(piece)
+            idx = 4 + constants.CLASSES.index(piece)
             try:
                 best_idx = pred[4:, idx].argmax()
             except ValueError:
@@ -46,15 +46,15 @@ class Classifier:
 
     @staticmethod
     def _zero_pawn_scores(pred, squares):
-        pawn_idx = [4 + CLASSES.index(p) for p in ['white-pawn', 'black-pawn']]
+        pawn_idx = [4 + constants.CLASSES.index(p) for p in ['white-pawn', 'black-pawn']]
         for p, square in zip(pred, squares):
             if square[1] in {'1', '8'}:
                 p[pawn_idx] = 0
         return pred
 
     def _get_square_centers(self):
-        grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * SQUARE_SIZE
-        square_centers = warp(grid, self.keypoints)
+        grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * constants.SQUARE_SIZE
+        square_centers = utils.warp(grid, self.keypoints)
         return square_centers
 
     def _preprocess_image(self, image):
@@ -105,10 +105,10 @@ class Classifier:
             matches[idxs[i]] = [distances[i], i]
         matches = {v[1]: k for k, v in matches.items()}
 
-        mask = np.array(list(matches.keys()))
+        mask = np.array(list(matches.keys()), dtype=int)
         pred = pred[mask]
         piece_centers = piece_centers[mask]
-        squares = [get_square(i) for i in matches.values()]
+        squares = [utils.get_square(i) for i in matches.values()]
 
         return pred, piece_centers, squares
 
@@ -123,7 +123,7 @@ class Classifier:
         for p, center, square in zip(pred, piece_centers, squares):
             bbox = np.round(p[:4]).astype(int)
             best_idx = np.argmax(p[4:])
-            piece = CLASSES[best_idx]
+            piece = constants.CLASSES[best_idx]
             conf = p[4 + best_idx]
             clean_pred.append(classification(bbox, conf, piece, center, square))
 

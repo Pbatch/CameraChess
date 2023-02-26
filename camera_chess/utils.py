@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import yaml
 
-from camera_chess.constants import DATA_DIR, BOARD_SIZE
+from camera_chess import constants
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves")
 
@@ -19,9 +19,9 @@ def get_square(idx):
 
 
 def load_video_config(dataset):
-    dataset_dir = os.path.join(DATA_DIR, dataset)
+    dataset_dir = os.path.join(constants.DATA_DIR, dataset)
 
-    with open(os.path.join(DATA_DIR, 'video_config.yaml')) as f:
+    with open(os.path.join(constants.DATA_DIR, 'video_config.yaml')) as f:
         config = yaml.safe_load(f)
     d = config[dataset]
     if 'fen' not in d:
@@ -52,10 +52,10 @@ def clear_dir(d):
 
 
 def warp(src, keypoints):
-    target = np.array([[BOARD_SIZE, BOARD_SIZE],
-                       [0, BOARD_SIZE],
+    target = np.array([[constants.BOARD_SIZE, constants.BOARD_SIZE],
+                       [0, constants.BOARD_SIZE],
                        [0, 0],
-                       [BOARD_SIZE, 0]], dtype=np.float32)
+                       [constants.BOARD_SIZE, 0]], dtype=np.float32)
     matrix = cv2.getPerspectiveTransform(keypoints, target)
     inv_matrix = np.linalg.inv(matrix)
     warped_src = cv2.perspectiveTransform(np.expand_dims(src, axis=0), inv_matrix)[0]

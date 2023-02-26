@@ -5,7 +5,7 @@ import cv2
 from PIL import ImageDraw, ImageFont, Image
 import imagesize
 
-from camera_chess.constants import COLOUR_MAP
+from camera_chess import constants
 
 
 class Visualizer:
@@ -33,8 +33,8 @@ class Visualizer:
 
         d = ImageDraw.Draw(image)
         for p in pred:
-            d.rectangle(tuple(p.bbox), width=5, outline=COLOUR_MAP[p.piece])
-            self._draw_text(d, p.bbox, p.piece)
+            d.rectangle(tuple(p.bbox), width=5, outline=constants.COLOUR_MAP[p.piece])
+            self._draw_text(d, p.bbox, f'{p.piece} ({p.conf:.2f})')
 
             bbox = [p.center[0] - 5, p.center[1] - 5,
                     p.center[0] + 5, p.center[1] + 5]
