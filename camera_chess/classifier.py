@@ -97,12 +97,13 @@ class Classifier:
         return pred, piece_centers
 
     def _filter_by_square(self, pred, piece_centers):
-        distances, idxs = self.kd_tree.query(piece_centers)
+        _, idxs = self.kd_tree.query(piece_centers)
         matches = {}
+        confs = np.max(pred[:, 4:], axis=1)
         for i in range(len(piece_centers)):
-            if idxs[i] in matches and distances[i] > matches[idxs[i]][0]:
+            if idxs[i] in matches and confs[i] > matches[idxs[i]][0]:
                 continue
-            matches[idxs[i]] = [distances[i], i]
+            matches[idxs[i]] = [confs[i], i]
         matches = {v[1]: k for k, v in matches.items()}
 
         mask = np.array(list(matches.keys()), dtype=int)
