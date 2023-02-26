@@ -9,3 +9,5 @@ ultralytics
 onnxruntime
 decord
 openvino
+requests
+websockets
