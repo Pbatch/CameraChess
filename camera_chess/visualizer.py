@@ -5,7 +5,7 @@ import cv2
 from PIL import ImageDraw, ImageFont, Image
 import imagesize
 
-from camera_chess import constants
+import constants
 
 
 class Visualizer:

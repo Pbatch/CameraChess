@@ -3,8 +3,8 @@ import ast
 import gradio as gr
 import numpy as np
 
-from camera_chess.classifier import Classifier
-from camera_chess.visualizer import Visualizer
+from classifier import Classifier
+from visualizer import Visualizer
 
 
 def get_board(image, keypoints):

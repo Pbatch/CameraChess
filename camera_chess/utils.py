@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import yaml
 
-from camera_chess import constants
+import constants
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves")
 

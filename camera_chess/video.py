@@ -3,7 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 from decord import VideoReader
-from camera_chess import constants, utils
+import constants, utils
 
 
 class Video:

@@ -4,7 +4,7 @@ from glob import glob
 
 import fiftyone as fo
 
-from camera_chess import constants
+import constants
 
 
 def load_label_studio():

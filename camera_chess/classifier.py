@@ -5,8 +5,8 @@ import numpy as np
 from openvino.runtime import Core
 from scipy.spatial import KDTree
 
-from camera_chess import constants
-from camera_chess import utils
+import constants
+import utils
 
 classification = namedtuple("Classification", "bbox conf piece center square")
 

@@ -6,7 +6,7 @@ import chess.pgn
 import chess.svg
 from PIL import Image
 
-from camera_chess import constants
+import constants
 
 
 class Action:

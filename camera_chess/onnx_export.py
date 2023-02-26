@@ -3,7 +3,7 @@ import os.path
 from ultralytics import YOLO
 import subprocess
 
-from camera_chess import constants
+import constants
 
 
 def pt_to_onnx(pt_path, size):

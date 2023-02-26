@@ -3,11 +3,11 @@ import os
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.classifier import Classifier
-from camera_chess.state import State
-from camera_chess import utils
-from camera_chess.video import Video
-from camera_chess.visualizer import Visualizer
+from classifier import Classifier
+from state import State
+import utils
+from video import Video
+from visualizer import Visualizer
 
 
 def main():
