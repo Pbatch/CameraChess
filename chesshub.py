@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import json
+import time
 
 import numpy as np
 import requests
@@ -45,21 +46,38 @@ async def connectToChessHub(connectionId):
             elif "UploadImage" in response:
                 print(response)
 
+        async def process_response(response):
+            if "ProcessImage" in response:
+                image = response
+                await process_image(image)
+            elif "UploadImage" in response:
+                print(response)
+
         async def process_image(image):
+            start = time.time()
+
             data = json.loads(image[:-1])
             image_data = json.loads(data['arguments'][0])
-            pil_image = Image.open(io.BytesIO(base64.b64decode(image_data['Image'])))
-
-            keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']], dtype=np.float32)
+            image_string = image_data['Image'].replace('data:image/jpeg;base64,', '')
+            pil_image = Image.open(io.BytesIO(base64.b64decode(image_string)))
+            try:
+                keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']], dtype=np.float32)
+            except Exception as e:
+                print(e)
+                return str(e)
             keypoints[..., 0] *= pil_image.width
             keypoints[..., 1] *= pil_image.height
             classifier.keypoints = keypoints
             classifier.set_kd_tree()
             pred = classifier.run(pil_image)
 
-            visualizer = Visualizer(keypoints)
-            pil_image = visualizer.add_bboxes(pil_image, pred)
-            pil_image.show()
+            # Debugging
+            # visualizer = Visualizer(keypoints)
+            # pil_image = visualizer.add_bboxes(pil_image, pred)
+            # pil_image.show()
+
+            end = time.time()
+            print(f'Elapsed: {end-start:.2f}')
             await send_image_processed(str(pred))
 
         async def send_image_processed(fen):
