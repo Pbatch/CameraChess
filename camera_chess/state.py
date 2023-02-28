@@ -36,11 +36,11 @@ class Action:
             self.error = f'Piece did not arrive at {self.to_square}'
             return
 
-        if self.to_square in square_to_gt:
-            pred = square_to_pred[self.to_square]
-            if pred.piece != self.piece:
-                self.error = f'Wrong piece classification at {self.to_square} ({pred.piece} != {self.piece})'
-                return
+        # if self.to_square in square_to_gt:
+        pred = square_to_pred[self.to_square]
+        if pred.piece != self.piece:
+            self.error = f'Wrong piece classification at {self.to_square} ({pred.piece} != {self.piece})'
+            return
 
         self.hits += 1
         if self.hits < self.min_hits:

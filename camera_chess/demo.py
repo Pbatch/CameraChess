@@ -11,14 +11,14 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'youtube/hikaru_sarin'
+    dataset = 'youtube/hari_tuan'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
     classifier = Classifier(model_path='models/480S.xml',
-                            conf_thres=0.1,
+                            conf_thres=0.5,
                             keypoints=video.new_keypoints)
-    visualizer = Visualizer()
+    visualizer = Visualizer(video.new_keypoints)
     state = State(video.new_keypoints,
                   video_config.fen,
                   min_hits=2)

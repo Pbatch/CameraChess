@@ -16,9 +16,9 @@ def main():
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    dataset = 'youtube/karayaman'
+    dataset = 'youtube/magnus_madaminov'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=2)
+    video = Video(video_config, target_fps=4)
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
                           'from_name': 'kp-1',

@@ -10,7 +10,7 @@ from camera_chess.visualizer import Visualizer
 def get_board(image, keypoints):
     keypoints = np.array(ast.literal_eval(keypoints),
                          dtype=np.float32)
-    classifier = Classifier('data/480S.onnx',
+    classifier = Classifier('models/480S.onnx',
                             keypoints=keypoints)
     visualizer = Visualizer()
     pred = classifier.run(image)

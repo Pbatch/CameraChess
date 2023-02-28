@@ -17,9 +17,16 @@ class Classifier:
         self.keypoints = keypoints
         self.conf_thres = conf_thres
 
-        self.square_centers = self._get_square_centers()
-        self.kd_tree = KDTree(self.square_centers)
+        self.kd_tree = None
+        self.compiled_model = None
+        self.output_layer_ir = None
+        self.vino_height = 0
+        self.vino_width = 0
 
+        self._load_model()
+        self.set_kd_tree()
+
+    def _load_model(self):
         ie = Core()
         model = ie.read_model(model=self.model_path)
         # model = ie.read_model(
@@ -27,9 +34,14 @@ class Classifier:
         #     weights="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.bin"
         # )
         self.compiled_model = ie.compile_model(model=model, device_name="CPU")
-        self.input_layer_ir = self.compiled_model.input(0)
+        input_layer_ir = self.compiled_model.input(0)
         self.output_layer_ir = self.compiled_model.output(0)
-        self.vino_height, self.vino_width = [int(i) for i in self.input_layer_ir.shape.to_string()[1:-1].split(',')[2:]]
+        self.vino_height, self.vino_width = [int(i) for i in input_layer_ir.shape.to_string()[1:-1].split(',')[2:]]
+
+    def set_kd_tree(self):
+        grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * SQUARE_SIZE
+        square_centers = warp(grid, self.keypoints)
+        self.kd_tree = KDTree(square_centers)
 
     @staticmethod
     def _zero_king_scores(pred):

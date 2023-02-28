@@ -14,6 +14,12 @@ def pt_to_onnx(pt_path, size):
                  half=True)
 
 
+def pt_to_tfjs(pt_path, size):
+    model = YOLO(pt_path)
+    model.export(format='tfjs',
+                 imgsz=size)
+
+
 def quantize(onnx_path, size):
     subprocess.call(['mo',
                      '--input_model', onnx_path,
@@ -34,8 +40,9 @@ def main():
     onnx_path = 'models/480S.onnx'
     size = 480
 
-    pt_to_onnx(pt_path, size)
-    quantize(onnx_path, size)
+    pt_to_tfjs(pt_path, size)
+    # pt_to_onnx(pt_path, size)
+    # quantize(onnx_path, size)
 
 
 if __name__ == '__main__':

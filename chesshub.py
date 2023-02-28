@@ -15,6 +15,9 @@ from camera_chess.visualizer import Visualizer
 # https://ChessVisualiserApi20230221132052.azurewebsites.net/chesshub => remote connection string (wss instead of ws)
 
 negotiation = requests.post('http://localhost:7272/chesshub/negotiate?negotiateVersion=0').json()
+classifier = Classifier(model_path='models/480S.xml',
+                        keypoints=np.array([[0, 0], [0, 1], [1, 1], [1, 0]], dtype=np.float32),
+                        conf_thres=0.1)
 
 
 def toSignalRMessage(data):
@@ -50,12 +53,11 @@ async def connectToChessHub(connectionId):
             keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']], dtype=np.float32)
             keypoints[..., 0] *= pil_image.width
             keypoints[..., 1] *= pil_image.height
-            classifier = Classifier(model_path='models/480S.xml',
-                                    keypoints=keypoints,
-                                    conf_thres=0.1)
+            classifier.keypoints = keypoints
+            classifier.set_kd_tree()
             pred = classifier.run(pil_image)
 
-            visualizer = Visualizer()
+            visualizer = Visualizer(keypoints)
             pil_image = visualizer.add_bboxes(pil_image, pred)
             pil_image.show()
             await send_image_processed(str(pred))

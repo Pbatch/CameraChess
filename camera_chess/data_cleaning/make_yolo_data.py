@@ -20,7 +20,7 @@ def main(image_size, train_fraction, max_split_size):
 
     youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
                         'shimanov_vidit', 'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
-                        'karayaman']
+                        'karayaman', 'hikaru_vasif', 'magnus_madaminov']
     roboflow_datasets = ['1', '2', '3', '4', '5']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])

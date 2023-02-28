@@ -6,7 +6,8 @@
 * Add logic to deal with in-progress moves
 * Explore proper quantization
 * Investigate blender script from Chesscog
-* Label more video data
+* Label more video data (Last two entries in video_config)
+* Move models out of VC to avoid GitHub limit
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog
