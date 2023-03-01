@@ -84,7 +84,7 @@ async def connectToChessHub(connectionId):
             classifier.set_kd_tree()
             state = State(keypoints,
                           fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-            pred = classifier.run(image)
+            pred = classifier.run(np.array(image))
 
             image = visualizer.add_bboxes(image, pred, keypoints)
             image = visualizer.add_board(image, state)
