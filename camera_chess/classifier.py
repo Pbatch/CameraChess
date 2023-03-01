@@ -91,7 +91,6 @@ class Classifier:
         pred[:, 2] += pred[:, 0]
         pred[:, 3] += pred[:, 1]
 
-        height, width = image.shape[:2]
         pred[:, [0, 2]] *= width / self.vino_width
         pred[:, [1, 3]] *= height / self.vino_height
         return pred
@@ -151,7 +150,7 @@ class Classifier:
 
         return clean_pred
 
-    def run(self, image):
+    def run(self, image: np.ndarray):
         pred = self._run_od(image)
         pred = self._post_process_pred(pred)
         return pred
