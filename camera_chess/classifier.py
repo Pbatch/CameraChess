@@ -1,8 +1,9 @@
+import os
 from collections import namedtuple
 
-import cv2
 import numpy as np
-from openvino.runtime import Core
+from openvino.preprocess import PrePostProcessor, ResizeAlgorithm
+from openvino.runtime import Core, Layout, Type
 from scipy.spatial import KDTree
 
 from camera_chess.constants import CLASSES, SQUARE_SIZE
@@ -17,26 +18,34 @@ class Classifier:
         self.keypoints = keypoints
         self.conf_thres = conf_thres
 
+        self.model = Core().read_model(model=self.model_path)
+        self.vino_height = 480
+        self.vino_width = 480
+
         self.kd_tree = None
         self.compiled_model = None
         self.output_layer_ir = None
-        self.vino_height = 0
-        self.vino_width = 0
+        self.input_width = 0
+        self.input_height = 0
 
-        self._load_model()
         self.set_kd_tree()
 
-    def _load_model(self):
-        ie = Core()
-        model = ie.read_model(model=self.model_path)
-        # model = ie.read_model(
-        #     model="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.xml",
-        #     weights="models/INT8/model_name_DefaultQuantization/2023-02-19_19-11-30/optimized/model_name.bin"
-        # )
-        self.compiled_model = ie.compile_model(model=model, device_name="CPU")
-        input_layer_ir = self.compiled_model.input(0)
+    def set_compiled_model(self):
+        core = Core()
+        ppp = PrePostProcessor(self.model)
+        model_input = ppp.input('images')
+        model_input.tensor()\
+            .set_layout(Layout('NHWC'))\
+            .set_shape([1, self.input_height, self.input_width, 3])\
+            .set_element_type(Type.u8)
+        model_input.preprocess()\
+            .convert_element_type(Type.f16)\
+            .scale([255])\
+            .resize(ResizeAlgorithm.RESIZE_LINEAR, self.vino_width, self.vino_height)
+        model_input.model().set_layout(Layout('NCHW'))
+        ppp_model = ppp.build()
+        self.compiled_model = core.compile_model(model=ppp_model, device_name="CPU")
         self.output_layer_ir = self.compiled_model.output(0)
-        self.vino_height, self.vino_width = [int(i) for i in input_layer_ir.shape.to_string()[1:-1].split(',')[2:]]
 
     def set_kd_tree(self):
         grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * SQUARE_SIZE
@@ -69,20 +78,20 @@ class Classifier:
         square_centers = warp(grid, self.keypoints)
         return square_centers
 
-    def _preprocess_image(self, image):
-        image = cv2.resize(image, (self.vino_width, self.vino_height), interpolation=cv2.INTER_CUBIC)
-        image = np.expand_dims(image.transpose(2, 0, 1), axis=0)
-        image = image / 255
-        image = image.astype(np.float16)
-        return image
-
-    def _run_od(self, np_image, width, height):
-        pred = self.compiled_model([np_image])[self.output_layer_ir][0]
+    def _run_od(self, image):
+        height, width = image.shape[:2]
+        if self.input_width != width or self.input_height != height:
+            self.input_width = width
+            self.input_height = height
+            self.set_compiled_model()
+        pred = self.compiled_model([np.expand_dims(image, axis=0)])[self.output_layer_ir][0]
         pred = pred.transpose((1, 0))
         pred[:, 0] -= pred[:, 2] / 2
         pred[:, 1] -= pred[:, 3] / 2
         pred[:, 2] += pred[:, 0]
         pred[:, 3] += pred[:, 1]
+
+        height, width = image.shape[:2]
         pred[:, [0, 2]] *= width / self.vino_width
         pred[:, [1, 3]] *= height / self.vino_height
         return pred
@@ -143,9 +152,6 @@ class Classifier:
         return clean_pred
 
     def run(self, image):
-        image = np.array(image)
-        original_height, original_width = image.shape[:2]
-        np_image = self._preprocess_image(image)
-        pred = self._run_od(np_image, original_width, original_height)
+        pred = self._run_od(image)
         pred = self._post_process_pred(pred)
         return pred

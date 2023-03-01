@@ -47,8 +47,8 @@ class Visualizer:
 
         return image
 
-    def add_board(self, image, board):
-        board_image = board.get_image()
+    def add_board(self, image, state):
+        board_image = state.get_image()
         board_image = board_image.resize((image.height, image.height))
 
         new_image = Image.new('RGB', (image.width + image.height, image.height))

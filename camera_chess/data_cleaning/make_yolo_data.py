@@ -20,7 +20,7 @@ def main(image_size, train_fraction, max_split_size):
 
     youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
                         'shimanov_vidit', 'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
-                        'karayaman', 'hikaru_vasif', 'magnus_madaminov']
+                        'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan', 'hans_rinat']
     roboflow_datasets = ['1', '2', '3', '4', '5']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
@@ -85,6 +85,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--image_size', type=int, default=480)
     parser.add_argument('-f', '--train_fraction', type=float, default=0.9)
-    parser.add_argument('-m', '--max_split_size', type=int, default=1000)
+    parser.add_argument('-m', '--max_split_size', type=int, default=2000)
     args = parser.parse_args()
     main(args.image_size, args.train_fraction, args.max_split_size)
