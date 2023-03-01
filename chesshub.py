@@ -2,7 +2,7 @@ import asyncio
 import base64
 import io
 import json
-import time
+import pickle
 
 import numpy as np
 import requests
@@ -10,6 +10,7 @@ import websockets
 from PIL import Image
 
 from camera_chess.classifier import Classifier
+from camera_chess.state import State
 from camera_chess.visualizer import Visualizer
 
 # http://localhost:7272/chesshub => local connection string
@@ -19,10 +20,25 @@ negotiation = requests.post('http://localhost:7272/chesshub/negotiate?negotiateV
 classifier = Classifier(model_path='models/480S.xml',
                         keypoints=np.array([[0, 0], [0, 1], [1, 1], [1, 0]], dtype=np.float32),
                         conf_thres=0.1)
+visualizer = Visualizer()
 
 
 def toSignalRMessage(data):
     return f'{json.dumps(data)}\u001e'
+
+
+def image_to_bytes(image):
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG")
+    image_bytes = base64.b64encode(buffer.getvalue())
+    return image_bytes
+
+
+def bytes_to_image(image_bytes):
+    image_string = image_bytes.replace('data:image/jpeg;base64,', '')
+    image = Image.open(io.BytesIO(base64.b64decode(image_string)))
+    return image
+
 
 
 async def connectToChessHub(connectionId):
@@ -53,32 +69,31 @@ async def connectToChessHub(connectionId):
             elif "UploadImage" in response:
                 print(response)
 
-        async def process_image(image):
-            start = time.time()
-
-            data = json.loads(image[:-1])
+        async def process_image(d):
+            data = json.loads(d[:-1])
             image_data = json.loads(data['arguments'][0])
-            image_string = image_data['Image'].replace('data:image/jpeg;base64,', '')
-            pil_image = Image.open(io.BytesIO(base64.b64decode(image_string)))
+            image = bytes_to_image(image_data['Image'])
             try:
                 keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']], dtype=np.float32)
             except Exception as e:
                 print(e)
                 return str(e)
-            keypoints[..., 0] *= pil_image.width
-            keypoints[..., 1] *= pil_image.height
+            keypoints[..., 0] *= image.width
+            keypoints[..., 1] *= image.height
             classifier.keypoints = keypoints
             classifier.set_kd_tree()
-            pred = classifier.run(pil_image)
+            state = State(keypoints,
+                          fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            pred = classifier.run(image)
 
-            # Debugging
-            # visualizer = Visualizer(keypoints)
-            # pil_image = visualizer.add_bboxes(pil_image, pred)
-            # pil_image.show()
+            image = visualizer.add_bboxes(image, pred, keypoints)
+            image = visualizer.add_board(image, state)
+            image.show()
 
-            end = time.time()
-            print(f'Elapsed: {end-start:.2f}')
-            await send_image_processed(str(pred))
+            output = {'image': image_to_bytes(image),
+                      'state': pickle.dumps(state)}
+
+            await send_image_processed(json.dumps(output))
 
         async def send_image_processed(fen):
             send_fen_message = {

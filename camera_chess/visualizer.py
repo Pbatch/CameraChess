@@ -9,8 +9,7 @@ from camera_chess.constants import COLOUR_MAP
 
 
 class Visualizer:
-    def __init__(self, keypoints):
-        self.keypoints = keypoints
+    def __init__(self):
         self.font = ImageFont.load_default()
 
     def _draw_text(self, d, bbox, text):
@@ -29,7 +28,7 @@ class Visualizer:
         d.rectangle(tuple(bbox))
         d.text((x, y - text_height), text=text)
 
-    def add_bboxes(self, image, pred):
+    def add_bboxes(self, image, pred, keypoints):
         image = image.copy()
 
         d = ImageDraw.Draw(image)
@@ -40,7 +39,7 @@ class Visualizer:
             bbox = [p.center[0] - 5, p.center[1] - 5,
                     p.center[0] + 5, p.center[1] + 5]
             d.ellipse(bbox, fill='green')
-        for x, y in self.keypoints:
+        for x, y in keypoints:
             bbox = [x - 5, y - 5,
                     x + 5, y + 5]
             d.ellipse(bbox, fill='black')
