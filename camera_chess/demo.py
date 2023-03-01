@@ -18,7 +18,7 @@ def main():
     classifier = Classifier(model_path='models/480S.xml',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)
-    visualizer = Visualizer(video.new_keypoints)
+    visualizer = Visualizer()
     state = State(video.new_keypoints,
                   video_config.fen,
                   min_hits=2)
@@ -31,7 +31,7 @@ def main():
             state.update(pred)
             if state.change:
                 image = Image.fromarray(image)
-                image = visualizer.add_bboxes(image, pred)
+                image = visualizer.add_bboxes(image, pred, video.new_keypoints)
                 image = visualizer.add_board(image, state)
                 image.save(os.path.join('debug', f'{frame}.jpg'))
                 move_no = state.board.ply() - 1
