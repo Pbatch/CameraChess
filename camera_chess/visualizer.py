@@ -2,10 +2,11 @@ import os
 from glob import glob
 
 import cv2
+import numpy as np
 from PIL import ImageDraw, ImageFont, Image
 import imagesize
 
-from camera_chess.constants import COLOUR_MAP
+from camera_chess.constants import COLOUR_MAP, CLASSES
 
 
 class Visualizer:
@@ -33,8 +34,11 @@ class Visualizer:
 
         d = ImageDraw.Draw(image)
         for p in pred:
-            d.rectangle(tuple(p.bbox), width=5, outline=COLOUR_MAP[p.piece])
-            self._draw_text(d, p.bbox, f'{p.piece} ({p.conf:.2f})')
+            best_idx = np.argmax(p.confs)
+            piece = CLASSES[best_idx]
+            conf = p.confs[best_idx]
+            d.rectangle(tuple(p.bbox), width=5, outline=COLOUR_MAP[piece])
+            self._draw_text(d, p.bbox, f'{piece} ({conf:.2f})')
 
             bbox = [p.center[0] - 5, p.center[1] - 5,
                     p.center[0] + 5, p.center[1] + 5]

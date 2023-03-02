@@ -13,15 +13,14 @@ from camera_chess.visualizer import Visualizer
 def main():
     dataset = 'youtube/anand_carlsen'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=4)
+    video = Video(video_config, target_fps=8)
     video.save_start_image()
-    classifier = Classifier(model_path='models/480S.xml',
+    classifier = Classifier(model_path='models/480S_quant.xml',
+                            weights_path='models/480S_quant.bin',
                             conf_thres=0.1,
                             keypoints=video.new_keypoints)
     visualizer = Visualizer()
-    state = State(video.new_keypoints,
-                  video_config.fen,
-                  min_hits=2)
+    state = State(video_config.fen)
     clear_dir('debug')
 
     correct = 0
@@ -42,7 +41,7 @@ def main():
                 else:
                     print(f'Predicted {pred_move} on move {move_no} '
                           f'at time {frame // video.fps} instead of {gt_move}')
-                    state.debug(gt_move, pred)
+                    print(state.move_to_score)
                     break
                 pbar.update(1)
     visualizer.create_video('debug', fps=video.target_fps)

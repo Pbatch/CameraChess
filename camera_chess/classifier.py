@@ -1,4 +1,3 @@
-import os
 from collections import namedtuple
 
 import numpy as np
@@ -9,16 +8,18 @@ from scipy.spatial import KDTree
 from camera_chess.constants import CLASSES, SQUARE_SIZE
 from camera_chess.utils import warp, get_square
 
-classification = namedtuple("Classification", "bbox conf piece center square")
+classification = namedtuple("Classification", "bbox confs center square")
 
 
 class Classifier:
-    def __init__(self, model_path, keypoints, conf_thres=0.2):
+    def __init__(self, model_path, keypoints, weights_path='', conf_thres=0.2):
         self.model_path = model_path
         self.keypoints = keypoints
+        self.weights_path = weights_path
         self.conf_thres = conf_thres
 
-        self.model = Core().read_model(model=self.model_path)
+        self.model = Core().read_model(model=self.model_path,
+                                       weights=self.weights_path)
         self.vino_height = 480
         self.vino_width = 480
 
@@ -31,7 +32,6 @@ class Classifier:
         self.set_kd_tree()
 
     def set_compiled_model(self):
-        core = Core()
         ppp = PrePostProcessor(self.model)
         model_input = ppp.input('images')
         model_input.tensor()\
@@ -44,26 +44,13 @@ class Classifier:
             .resize(ResizeAlgorithm.RESIZE_LINEAR, self.vino_width, self.vino_height)
         model_input.model().set_layout(Layout('NCHW'))
         ppp_model = ppp.build()
-        self.compiled_model = core.compile_model(model=ppp_model, device_name="CPU")
+        self.compiled_model = Core().compile_model(model=ppp_model, device_name="CPU")
         self.output_layer_ir = self.compiled_model.output(0)
 
     def set_kd_tree(self):
         grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * SQUARE_SIZE
         square_centers = warp(grid, self.keypoints)
         self.kd_tree = KDTree(square_centers)
-
-    @staticmethod
-    def _zero_king_scores(pred):
-        for piece in ['white-king', 'black-king']:
-            idx = 4 + CLASSES.index(piece)
-            try:
-                best_idx = pred[4:, idx].argmax()
-            except ValueError:
-                continue
-            best_score = pred[4 + best_idx, idx]
-            pred[:, idx] = 0
-            pred[4 + best_idx, idx] = best_score
-        return pred
 
     @staticmethod
     def _zero_pawn_scores(pred, squares):
@@ -137,17 +124,13 @@ class Classifier:
         pred = self._filter_by_confidence(pred)
         pred, piece_centers = self._filter_by_roi(pred)
         pred, piece_centers, squares = self._filter_by_square(pred, piece_centers)
-        pred = self._zero_king_scores(pred)
         pred = self._zero_pawn_scores(pred, squares)
 
         clean_pred = []
         for p, center, square in zip(pred, piece_centers, squares):
             bbox = np.round(p[:4]).astype(int)
-            best_idx = np.argmax(p[4:])
-            piece = CLASSES[best_idx]
-            conf = p[4 + best_idx]
-            clean_pred.append(classification(bbox, conf, piece, center, square))
-
+            confs = p[4:]
+            clean_pred.append(classification(bbox, confs, center, square))
         return clean_pred
 
     def run(self, image: np.ndarray):
