@@ -40,7 +40,6 @@ def bytes_to_image(image_bytes):
     return image
 
 
-
 async def connectToChessHub(connectionId):
     uri = f"ws://localhost:7272/chesshub?id={connectionId}"
     async with websockets.connect(uri) as websocket:
@@ -74,7 +73,8 @@ async def connectToChessHub(connectionId):
             image_data = json.loads(data['arguments'][0])
             image = bytes_to_image(image_data['Image'])
             try:
-                keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']], dtype=np.float32)
+                keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']],
+                                     dtype=np.float32)
             except Exception as e:
                 print(e)
                 return str(e)
@@ -90,8 +90,8 @@ async def connectToChessHub(connectionId):
             image = visualizer.add_board(image, state)
             image.show()
 
-            output = {'image': str(image_to_bytes(image)),
-                      'state': str(pickle.dumps(state))}
+            output = {'image': image_to_bytes(image).decode(),
+                      'state': pickle.dumps(state).decode()}
 
             await send_image_processed(json.dumps(output))
 
