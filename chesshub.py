@@ -87,10 +87,9 @@ async def connectToChessHub(connectionId):
 
             image = visualizer.add_bboxes(image, pred, keypoints)
             image = visualizer.add_board(image, state)
-            image.show()
 
             output = {'image': image_to_bytes(image).decode(),
-                      'state': pickle.dumps(state).decode()}
+                      'state': pickle.dumps(state).decode("ISO-8859-1")}
 
             await send_image_processed(json.dumps(output))
 
