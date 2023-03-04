@@ -51,7 +51,11 @@ async def connectToChessHub(connectionId):
 
         async def listen():
             while _running:
-                response = await websocket.recv()
+                try:
+                    response = await websocket.recv()
+                except websockets.ConnectionClosed as e:
+                    print(f'Connected closed: {e}')
+                    continue
                 await process_response(response)
 
         async def process_response(response):
