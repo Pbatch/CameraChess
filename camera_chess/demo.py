@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from camera_chess.detector import Detector
 from camera_chess.state import State
-from camera_chess.tracker.tracker import Tracker
+from camera_chess.tracker import Tracker
 from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.video import Video
 from camera_chess.visualizer import Visualizer
