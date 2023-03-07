@@ -11,3 +11,5 @@ decord
 openvino
 requests
 websockets
+torch
+nncf

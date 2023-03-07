@@ -1,12 +1,12 @@
 import os
+from collections import defaultdict
 from glob import glob
 
 import cv2
-import numpy as np
-from PIL import ImageDraw, ImageFont, Image
 import imagesize
+from PIL import ImageDraw, ImageFont, Image
 
-from camera_chess.constants import COLOUR_MAP, CLASSES
+from camera_chess.constants import COLOUR_MAP
 
 
 class Visualizer:
@@ -15,7 +15,7 @@ class Visualizer:
 
     def _draw_text(self, d, bbox, text):
         text_width, text_height = self.font.getsize(text)
-        y_offset = 5
+        y_offset = -10
         x = (bbox[0] + bbox[2] - text_width) / 2
         y = bbox[1] - y_offset
 
@@ -29,24 +29,34 @@ class Visualizer:
         d.rectangle(tuple(bbox))
         d.text((x, y - text_height), text=text)
 
-    def add_bboxes(self, image, pred, keypoints):
+    @staticmethod
+    def _draw_points(d, xy, colour, radius=5):
+        for x, y in xy:
+            bbox = [x - radius, y - radius,
+                    x + radius, y + radius]
+            d.ellipse(bbox, fill=colour)
+
+    def add_bboxes(self, image, tracks, keypoints):
         image = image.copy()
 
         d = ImageDraw.Draw(image)
-        for p in pred:
-            best_idx = np.argmax(p.confs)
-            piece = CLASSES[best_idx]
-            conf = p.confs[best_idx]
-            d.rectangle(tuple(p.bbox), width=5, outline=COLOUR_MAP[piece])
-            self._draw_text(d, p.bbox, f'{piece} ({conf:.2f})')
+        square_to_tracks = defaultdict(list)
+        for track in tracks:
+            d.rectangle(tuple(track.bbox), width=5, outline=COLOUR_MAP[track.piece])
+            square_to_tracks[track.square].append(track)
 
-            bbox = [p.center[0] - 5, p.center[1] - 5,
-                    p.center[0] + 5, p.center[1] + 5]
-            d.ellipse(bbox, fill='green')
-        for x, y in keypoints:
-            bbox = [x - 5, y - 5,
-                    x + 5, y + 5]
-            d.ellipse(bbox, fill='black')
+            self._draw_points(d, [track.center], 'green')
+
+        for square, tracks in square_to_tracks.items():
+            bbox = tracks[0].bbox
+            speed = tracks[0].speed
+            text_items = [f'{track.piece}={track.score:.2f}' for track in tracks]
+            if speed > 1.0:
+                text_items.append(f'v={speed:.6f}')
+            text = ', '.join(text_items)
+            self._draw_text(d, bbox, text)
+
+        self._draw_points(d, keypoints, 'black')
 
         return image
 

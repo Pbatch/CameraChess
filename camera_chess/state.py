@@ -11,10 +11,10 @@ from camera_chess.constants import PIECE_TO_CLASS, CLASSES
 
 
 class State:
-    ALPHA = 0.9
-
-    def __init__(self, fen):
+    def __init__(self, fen, move_thresh=0.0, speed_thresh=1.0):
         self.fen = fen
+        self.move_thresh = move_thresh
+        self.speed_thresh = speed_thresh
 
         self.board = chess.Board(self.fen)
         self.game = chess.pgn.Game()
@@ -51,27 +51,39 @@ class State:
         image = Image.open(write_to)
         return image
 
-    def update(self, pred):
+    def update(self, tracks):
         self.change = False
 
-        missed = {chess.square_name(square) for square in chess.SQUARES}
-        for p in pred:
-            self.confs[p.square] = self.ALPHA * self.confs[p.square] + (1 - self.ALPHA) * p.confs
-            missed.remove(p.square)
-        for square in missed:
-            self.confs[square] = self.ALPHA * self.confs[square]
+        square_to_scores = {chess.square_name(square): np.zeros(len(CLASSES), dtype=np.float32)
+                            for square in chess.SQUARES}
+        square_to_speed = {chess.square_name(square): 0.0
+                           for square in chess.SQUARES}
+        for track in tracks:
+            piece_idx = CLASSES.index(track.piece)
+            square_to_scores[track.square][piece_idx] = max(square_to_scores[track.square][piece_idx], track.score)
+            square_to_speed[track.square] = max(square_to_speed[track.square], track.speed)
 
-        self.move_to_score = {}
+        valid_moves = []
         for move in list(self.board.legal_moves):
             from_square = str(move)[:2]
             to_square = str(move)[2:]
-            piece = PIECE_TO_CLASS[self.board.piece_at(move.from_square)]
-            piece_idx = CLASSES.index(piece)
+            piece_idx = CLASSES.index(PIECE_TO_CLASS[self.board.piece_at(move.from_square)])
 
-            score = (1 - self.confs[from_square][piece_idx]) * self.confs[to_square][piece_idx]
-            self.move_to_score[str(move)] = score
-        self.move_to_score = {k: v for k, v in sorted(self.move_to_score.items(), key=lambda x: -x[1])}
+            from_score = np.max(square_to_scores[from_square])
+            arrival_score = square_to_scores[to_square][piece_idx]
+            arrival_speed = square_to_speed[to_square]
 
-        best_move, best_score = list(self.move_to_score.items())[0]
-        if best_score > 0.05:
+            if from_score > 0:
+                continue
+
+            if arrival_score <= self.move_thresh:
+                continue
+
+            if arrival_speed > self.speed_thresh and not chess.Board.is_castling(self.board, move):
+                continue
+
+            valid_moves.append([str(move), arrival_score])
+
+        if len(valid_moves):
+            best_move = max(valid_moves, key=lambda x: x[1])[0]
             self._play_move(chess.Move.from_uci(best_move))

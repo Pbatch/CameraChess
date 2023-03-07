@@ -25,13 +25,13 @@ def onnx_to_openvino(onnx_path, size):
 
 
 def main():
-    pt_path = 'models/480M.pt'
+    pt_path = 'models/480S.pt'
     onnx_path = 'models/480S.onnx'
     size = 480
 
     # pt_to_tfjs(pt_path, size)
-    # pt_to_onnx(pt_path, size)
-    # onnx_to_openvino(onnx_path, size)
+    pt_to_onnx(pt_path, size)
+    onnx_to_openvino(onnx_path, size)
 
 
 if __name__ == '__main__':

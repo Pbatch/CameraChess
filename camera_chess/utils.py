@@ -1,6 +1,7 @@
 import os
 import shutil
 from collections import namedtuple
+from glob import glob
 
 import chess.pgn
 import cv2
@@ -30,7 +31,7 @@ def load_video_config(dataset):
     video_config_ = video_config(start=d['start'],
                                  end=d['end'],
                                  url=d['url'],
-                                 path=os.path.join(dataset_dir, 'video.webm'),
+                                 path=glob(os.path.join(dataset_dir, 'video.*'))[0],
                                  keypoints=np.array(d['keypoints'], dtype=np.float32),
                                  fen=d['fen'],
                                  moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')))

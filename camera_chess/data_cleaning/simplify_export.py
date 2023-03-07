@@ -7,8 +7,8 @@ from camera_chess.constants import DATA_DIR
 
 
 def main():
-    export_id = 'project-1-at-2023-03-01-00-38-2848ac3d'
-    dataset = 'youtube/hari_tuan'
+    export_id = 'project-1-at-2023-03-04-15-46-eba7be2f'
+    dataset = 'peter/kasparov_immortal'
     with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:
         labels = json.load(f)
 

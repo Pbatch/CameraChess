@@ -68,7 +68,7 @@ def default_quantization(model_path):
 
 
 def main():
-    model_path = 'models/480M.xml'
+    model_path = 'models/480S.xml'
     default_quantization(model_path)
 
 

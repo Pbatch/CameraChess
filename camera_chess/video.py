@@ -3,14 +3,13 @@ import os
 import numpy as np
 from PIL import Image
 from decord import VideoReader
-from camera_chess.constants import SQUARE_SIZE
-from camera_chess.utils import warp
 
 
 class Video:
-    def __init__(self, video_config, target_fps=1):
+    def __init__(self, video_config, target_fps=1, padding=None):
         self.video_config = video_config
         self.target_fps = target_fps
+        self.padding = padding if padding is not None else [50, 100, 50, 10]
 
         if not os.path.isfile(self.video_config.path):
             raise FileNotFoundError(f'{self.video_config.path} does not exist')
@@ -25,20 +24,17 @@ class Video:
         self.l, self.t, self.r, self.b = [int(i) for i in self.roi]
         self.width = float(self.roi[2] - self.roi[0])
         self.height = float(self.roi[3] - self.roi[1])
-        self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]])
+        self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]], dtype=np.float32)
         self.frames = [i for i in range(len(self.vr))
                        if (self.start_frame <= i <= self.end_frame)
                        and i % self.mod == 0]
 
     def _get_roi(self):
-        border = np.array([[-2, -2], [10, -2], [10, 10], [-2, 10]], dtype=np.float32) * SQUARE_SIZE
-        extremities = warp(border, self.video_config.keypoints)
-
         height, width = self.vr[0].asnumpy().shape[:2]
-        roi = [max(np.min(extremities[:, 0]), 0),
-               max(np.min(extremities[:, 1]), 0),
-               min(np.max(extremities[:, 0]), width),
-               min(np.max(extremities[:, 1]), height)]
+        roi = [max(np.min(self.video_config.keypoints[:, 0]) - self.padding[0], 0),
+               max(np.min(self.video_config.keypoints[:, 1]) - self.padding[1], 0),
+               min(np.max(self.video_config.keypoints[:, 0]) + self.padding[2], width),
+               min(np.max(self.video_config.keypoints[:, 1]) + self.padding[3], height)]
         return roi
 
     def __iter__(self):
