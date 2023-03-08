@@ -18,11 +18,9 @@ class Tracker:
                  track_low_thresh=0.1,
                  new_track_thresh=0.6,
                  track_buffer=30,
-                 match_thresh=0.8,
-                 config_path=os.path.join(ROOT_DIR, 'camera_chess', 'tracker', 'default.yaml')):
+                 match_thresh=0.8):
         self.fps = fps
         self.keypoints = keypoints
-        self.config_path = config_path
 
         args = {'track_high_thresh': track_high_thresh,
                 'track_low_thresh': track_low_thresh,

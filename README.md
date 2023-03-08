@@ -2,11 +2,9 @@
 
 ## TODO
 
-* Add logic to restrict piece amounts by what is currently on the board
-* Add logic to deal with in-progress moves
 * Explore proper quantization
 * Investigate blender script from Chesscog
-* Move models out of VC to avoid GitHub limit
+* Label more diverse chess sets
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

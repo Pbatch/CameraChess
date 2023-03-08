@@ -6,8 +6,10 @@ from ultralytics import YOLO
 def pt_to_onnx(pt_path, size):
     model = YOLO(pt_path)
     model.export(format='onnx',
-                 imgsz=size,
-                 simplify=True)
+                 imgsz=size)
+
+    url = "https://convertmodel.com/#input=onnx&output=onnx"
+    print(f'Go to {url} for simplify the model')
 
 
 def pt_to_tfjs(pt_path, size):
@@ -26,11 +28,10 @@ def onnx_to_openvino(onnx_path, size):
 
 def main():
     pt_path = 'models/480S.pt'
-    onnx_path = 'models/480S.onnx'
+    onnx_path = 'models/480S-sim.onnx'
     size = 480
 
-    # pt_to_tfjs(pt_path, size)
-    pt_to_onnx(pt_path, size)
+    # pt_to_onnx(pt_path, size)
     onnx_to_openvino(onnx_path, size)
 
 

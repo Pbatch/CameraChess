@@ -12,12 +12,12 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'peter/peter_emma'
+    dataset = 'youtube/master_andrea'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
-    detector = Detector(model_path='models/480S_quant.xml',
-                        weights_path='models/480S_quant.bin',
+    detector = Detector(model_path='models/480S-sim-quant.xml',
+                        weights_path='models/480S-sim-quant.bin',
                         conf_thres=0.1,
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,
@@ -28,12 +28,14 @@ def main():
     clear_dir('debug')
 
     correct = 0
+    error = None
     with tqdm(total=len(video_config.moves), desc='Move') as pbar:
         for image, frame in tqdm(video, desc='Frame'):
             detections = detector.run(image)
             tracks = tracker.update(detections)
             state.update(tracks)
             if state.change:
+                pbar.update(1)
                 image = Image.fromarray(image)
                 image = visualizer.add_bboxes(image, tracks, video.new_keypoints)
                 image = visualizer.add_board(image, state)
@@ -44,15 +46,15 @@ def main():
                 if pred_move == gt_move:
                     correct += 1
                 else:
-                    print(f'Predicted {pred_move} on move {move_no} '
-                          f'at frame {frame} instead of {gt_move}')
-                    print(state.move_to_score)
+                    error = f'Predicted {pred_move} on move {move_no} at frame {frame} instead of {gt_move}'
                     break
                 if move_no == len(video_config.moves) - 1:
                     break
-                pbar.update(1)
-    visualizer.create_video('debug', fps=1)
+    if error is not None:
+        print(error)
     print(f'{correct}/{len(video_config.moves)} moves were tracked correctly')
+
+    visualizer.create_video('debug', fps=1)
 
 
 if __name__ == '__main__':

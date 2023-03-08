@@ -62,13 +62,13 @@ def default_quantization(model_path):
                                     target_device=nncf.TargetDevice.CPU,
                                     ignored_scope=ignored_scope)
 
-    save_path = model_path.replace('.xml', '_quant.xml')
+    save_path = model_path.replace('.xml', '-quant.xml')
     print(f'Saving quantized model to {save_path}')
     serialize(quantized_model, save_path)
 
 
 def main():
-    model_path = 'models/480S.xml'
+    model_path = 'models/480S-sim.xml'
     default_quantization(model_path)
 
 

@@ -21,27 +21,12 @@ class State:
         self.node = self.game
         self.change = False
         self.last_move = None
-        self.move_to_score = {}
-
-        self.confs = self._set_confs()
-
-    def _set_confs(self):
-        confs = {}
-        for square in chess.SQUARES:
-            piece = self.board.piece_at(square)
-
-            p = np.zeros(len(CLASSES), dtype=np.float32)
-            if piece is not None:
-                p[CLASSES.index(PIECE_TO_CLASS[piece])] = 1.0
-            confs[chess.square_name(square)] = p
-        return confs
 
     def _play_move(self, move):
         self.board.push(move)
         self.node = self.node.add_variation(move)
         self.change = True
         self.last_move = str(move)
-        self._set_confs()
 
     def get_image(self):
         bytestring = chess.svg.board(self.board, size=300)
