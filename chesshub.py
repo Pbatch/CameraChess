@@ -14,6 +14,10 @@ from camera_chess.state import State
 from camera_chess.tracker import Tracker
 from camera_chess.visualizer import Visualizer
 
+import logging
+
+logger = logging.getLogger()
+
 # http://localhost:7272/chesshub => local connection string
 # https://ChessVisualiserApi20230221132052.azurewebsites.net/chesshub => remote connection string (wss instead of ws)
 
@@ -81,13 +85,14 @@ async def connectToChessHub(connectionId):
 
         async def process_image(d):
             data = json.loads(d[:-1])
+            logger.info(data)
             image_data = json.loads(data['arguments'][0])
             image = bytes_to_image(image_data['Image'])
             try:
                 keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']],
                                      dtype=np.float32)
             except Exception as e:
-                print(e)
+                logger.error(e)
                 return str(e)
             keypoints[..., 0] *= image.width
             keypoints[..., 1] *= image.height
