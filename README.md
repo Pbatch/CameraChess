@@ -16,3 +16,10 @@
 * Chesscog - https://github.com/georg-wolflein/chesscog-report/raw/master/report.pdf
 * Chamfer matching - https://static1.squarespace.com/static/5fb9c8b175e654100b273fd3/t/5fd4b60d0f11661d4c015070/1607775761754/2018_ChessPieceRecognition_WACV.pdf
 
+## Useful
+
+Tar scripts for Google Drive
+```bash
+tar -zcvf models.tar.gz models
+tar --exclude='*.webm' --exclude='*.tar.gz' --exclude='*.mp4' -zcvf data.tar.gz data
+```

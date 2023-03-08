@@ -5,4 +5,9 @@ debug
 blender
 models
 .idea/
+
+*.tar.gz
+*.jpg
+*.png
+
 **/__pycache__/
