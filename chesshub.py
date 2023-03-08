@@ -14,10 +14,6 @@ from camera_chess.state import State
 from camera_chess.tracker import Tracker
 from camera_chess.visualizer import Visualizer
 
-import logging
-
-logger = logging.getLogger()
-
 # http://localhost:7272/chesshub => local connection string
 # https://ChessVisualiserApi20230221132052.azurewebsites.net/chesshub => remote connection string (wss instead of ws)
 
@@ -30,7 +26,7 @@ detector = Detector(model_path='models/480S-sim-quant.xml',
 visualizer = Visualizer()
 
 
-def toSignalRMessage(data):
+def to_signalr_message(data):
     return f'{json.dumps(data)}\u001e'
 
 
@@ -51,12 +47,12 @@ def obj_to_bytes(obj):
     return pickle.dumps(obj).decode("ISO-8859-1")
 
 
-async def connectToChessHub(connectionId):
-    uri = f"ws://localhost:7272/chesshub?id={connectionId}"
+async def connect_to_chess_hub(connection_id):
+    uri = f"ws://localhost:7272/chesshub?id={connection_id}"
     async with websockets.connect(uri) as websocket:
 
         async def handshake():
-            await websocket.send(toSignalRMessage({"protocol": "json", "version": 1}))
+            await websocket.send(to_signalr_message({"protocol": "json", "version": 1}))
             handshake_response = await websocket.recv()
             print(f"handshake_response: {handshake_response}")
 
@@ -76,23 +72,15 @@ async def connectToChessHub(connectionId):
             elif "UploadImage" in response:
                 print(response)
 
-        async def process_response(response):
-            if "ProcessImage" in response:
-                image = response
-                await process_image(image)
-            elif "UploadImage" in response:
-                print(response)
-
         async def process_image(d):
             data = json.loads(d[:-1])
-            logger.info(data)
             image_data = json.loads(data['arguments'][0])
             image = bytes_to_image(image_data['Image'])
             try:
                 keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']],
                                      dtype=np.float32)
             except Exception as e:
-                logger.error(e)
+                print(e)
                 return str(e)
             keypoints[..., 0] *= image.width
             keypoints[..., 1] *= image.height
@@ -125,7 +113,7 @@ async def connectToChessHub(connectionId):
                 ]
             }
 
-            await websocket.send(toSignalRMessage(send_fen_message))
+            await websocket.send(to_signalr_message(send_fen_message))
 
         await handshake()
 
@@ -137,4 +125,4 @@ async def connectToChessHub(connectionId):
 
 
 print(f"connectionId: {negotiation['connectionId']}")
-asyncio.run(connectToChessHub(negotiation['connectionId']))
+asyncio.run(connect_to_chess_hub(negotiation['connectionId']))
