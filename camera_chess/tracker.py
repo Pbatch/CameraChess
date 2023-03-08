@@ -17,7 +17,7 @@ class Tracker:
                  track_high_thresh=0.6,
                  track_low_thresh=0.1,
                  new_track_thresh=0.6,
-                 track_buffer=30,
+                 track_buffer=60,
                  match_thresh=0.8):
         self.fps = fps
         self.keypoints = keypoints

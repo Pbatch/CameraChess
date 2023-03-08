@@ -12,7 +12,7 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'youtube/master_andrea'
+    dataset = 'peter/bronstein_teschner'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
