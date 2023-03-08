@@ -9,17 +9,20 @@ import requests
 import websockets
 from PIL import Image
 
-from camera_chess.classifier import Classifier
+from camera_chess.detector import Detector
 from camera_chess.state import State
+from camera_chess.tracker import Tracker
 from camera_chess.visualizer import Visualizer
 
 # http://localhost:7272/chesshub => local connection string
 # https://ChessVisualiserApi20230221132052.azurewebsites.net/chesshub => remote connection string (wss instead of ws)
 
 negotiation = requests.post('http://localhost:7272/chesshub/negotiate?negotiateVersion=0').json()
-classifier = Classifier(model_path='models/480S.xml',
-                        keypoints=np.array([[0, 0], [0, 1], [1, 1], [1, 0]], dtype=np.float32),
-                        conf_thres=0.1)
+detector = Detector(model_path='models/480S-sim-quant.xml',
+                    weights_path='models/480S-sim-quant.bin',
+                    conf_thres=0.1,
+                    keypoints=np.array([[0, 0], [0, 1], [1, 1], [1, 0]], dtype=np.float32))
+
 visualizer = Visualizer()
 
 
@@ -30,7 +33,7 @@ def toSignalRMessage(data):
 def image_to_bytes(image):
     buffer = io.BytesIO()
     image.save(buffer, format="JPEG")
-    image_bytes = base64.b64encode(buffer.getvalue())
+    image_bytes = base64.b64encode(buffer.getvalue()).decode()
     return image_bytes
 
 
@@ -38,6 +41,10 @@ def bytes_to_image(image_bytes):
     image_string = image_bytes.replace('data:image/jpeg;base64,', '')
     image = Image.open(io.BytesIO(base64.b64decode(image_string)))
     return image
+
+
+def obj_to_bytes(obj):
+    return pickle.dumps(obj).decode("ISO-8859-1")
 
 
 async def connectToChessHub(connectionId):
@@ -84,16 +91,22 @@ async def connectToChessHub(connectionId):
                 return str(e)
             keypoints[..., 0] *= image.width
             keypoints[..., 1] *= image.height
-            classifier.keypoints = keypoints
-            classifier.set_kd_tree()
-            state = State(fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-            pred = classifier.run(np.array(image))
 
-            image = visualizer.add_bboxes(image, pred, keypoints)
+            detector.keypoints = keypoints
+            state = State(fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+            tracker = Tracker(fps=1,
+                              keypoints=keypoints,
+                              track_low_thresh=detector.conf_thres)
+            detections = detector.run(np.array(image))
+            tracks = tracker.update(detections)
+            state.update(tracks)
+
+            image = visualizer.add_bboxes(image, tracks, keypoints)
             image = visualizer.add_board(image, state)
 
-            output = {'image': image_to_bytes(image).decode(),
-                      'state': pickle.dumps(state).decode("ISO-8859-1")}
+            output = {'image': image_to_bytes(image),
+                      'state': pickle.dumps(state).decode("ISO-8859-1"),
+                      'tracker': pickle.dumps(tracker).decode("ISO-8859-1")}
 
             await send_image_processed(json.dumps(output))
 
