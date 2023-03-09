@@ -69,6 +69,14 @@ class State:
 
             valid_moves.append([str(move), arrival_score])
 
-        if len(valid_moves):
-            best_move = max(valid_moves, key=lambda x: x[1])[0]
-            self._play_move(chess.Move.from_uci(best_move))
+        if len(valid_moves) == 0:
+            return
+
+        best_move = max(valid_moves, key=lambda x: x[1])
+        clashing_moves = [move for move in valid_moves if move[0][2:] == best_move[0][2:] and move != best_move]
+        if len(clashing_moves):
+            print(f'{clashing_moves} clash with {best_move}')
+            print('Waiting...')
+            return
+
+        self._play_move(chess.Move.from_uci(best_move[0]))

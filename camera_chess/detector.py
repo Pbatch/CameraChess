@@ -7,11 +7,9 @@ Detections = namedtuple("Detections", "xyxy conf cls")
 
 
 class Detector:
-    def __init__(self, model_path, keypoints, conf_thres=0.1, iou_thres=0.4):
+    def __init__(self, model_path, keypoints):
         self.model_path = model_path
         self.keypoints = keypoints
-        self.conf_thres = conf_thres
-        self.iou_thres = iou_thres
 
         self.sess = onnxruntime.InferenceSession(self.model_path)
         self.output_name = self.sess.get_outputs()[0].name

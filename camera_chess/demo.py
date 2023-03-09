@@ -12,16 +12,17 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    dataset = 'peter/bronstein_teschner'
+    dataset = 'peter/melgosa_zuluaga'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
     detector = Detector(model_path='models/480S.onnx',
-                        conf_thres=0.1,
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,
                       keypoints=video.new_keypoints,
-                      track_low_thresh=detector.conf_thres)
+                      new_track_thresh=0.3,
+                      track_high_thresh=0.3,
+                      track_low_thresh=0.1)
     visualizer = Visualizer()
     state = State(video_config.fen)
     clear_dir('debug')
