@@ -18,10 +18,9 @@ def pt_to_tfjs(pt_path, size):
                  imgsz=size)
 
 
-def onnx_to_openvino(onnx_path, size):
+def onnx_to_openvino(onnx_path):
     subprocess.call(['mo',
                      '--input_model', onnx_path,
-                     '--input_shape', f'[1,3,{size},{size}]',
                      '--data_type', 'FP16',
                      '--output_dir', 'models/'])
 
@@ -32,7 +31,7 @@ def main():
     size = 480
 
     # pt_to_onnx(pt_path, size)
-    onnx_to_openvino(onnx_path, size)
+    onnx_to_openvino(onnx_path)
 
 
 if __name__ == '__main__':

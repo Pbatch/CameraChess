@@ -16,8 +16,7 @@ def main():
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
-    detector = Detector(model_path='models/480S-sim-quant.xml',
-                        weights_path='models/480S-sim-quant.bin',
+    detector = Detector(model_path='models/480S.onnx',
                         conf_thres=0.1,
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,

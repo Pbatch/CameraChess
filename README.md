@@ -5,6 +5,7 @@
 * Explore proper quantization
 * Investigate blender script from Chesscog
 * Label more diverse chess sets
+* Make ROI less severe
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

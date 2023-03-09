@@ -49,8 +49,8 @@ def load_yolo():
 
 
 def main():
-    # dataset = load_yolo().shuffle()
-    dataset = load_label_studio()
+    dataset = load_yolo().shuffle()
+    # dataset = load_label_studio()
     session = fo.launch_app(dataset)
     session.wait()
 

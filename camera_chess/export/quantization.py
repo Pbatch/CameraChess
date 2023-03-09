@@ -24,10 +24,6 @@ class ValDataset(Dataset):
     def __getitem__(self, index):
         image_path = self.image_paths[index]
         image = np.array(Image.open(image_path).convert('RGB'))
-        image = cv2.resize(image, (480, 480), interpolation=cv2.INTER_CUBIC)
-        image = np.expand_dims(image.transpose(2, 0, 1), axis=0)
-        image = image / 255
-        image = image.astype(np.float32)
 
         return image
 
