@@ -14,7 +14,8 @@ class Detector:
 
         model = Core().read_model(model=self.model_path,
                                   weights=self.weights_path)
-        self.model = Core().compile_model(model=model, device_name="CPU")
+        self.model = Core().compile_model(model=model, device_name="CPU",
+                                          config={"PERFORMANCE_HINT": "THROUGHPUT"})
         self.input_layer_ir = self.model.input(0)
         self.infer_request = self.model.create_infer_request()
 

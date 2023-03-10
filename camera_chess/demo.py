@@ -1,19 +1,44 @@
 import os
 
+import numpy as np
 from PIL import Image
 from openvino.runtime import AsyncInferQueue
+from openvino.runtime import Tensor
 from tqdm import tqdm
 
-from camera_chess.detector import Detector
+from camera_chess.detector import Detector, Detections
 from camera_chess.state import State
 from camera_chess.tracker import Tracker
 from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.video import Video
 from camera_chess.visualizer import Visualizer
 
+error = None
+correct = 0
 
-def callback():
-    pass
+
+def callback(infer_request, info):
+    detector, tracker, state, visualizer, image, frame, moves = info
+    global error
+    global correct
+
+    pred = infer_request.get_output_tensor(0).data
+    pred = detector._filter_by_roi(pred)
+    detections = Detections(pred[:, :4], pred[:, 4], pred[:, 5].astype(int))
+    tracks = tracker.update(detections)
+    state.update(tracks)
+    if state.change:
+        image = Image.fromarray(image)
+        image = visualizer.add_bboxes(image, tracks, detector.keypoints)
+        image = visualizer.add_board(image, state)
+        image.save(os.path.join('debug', f'{frame}.jpg'))
+        move_no = state.board.ply() - 1
+        pred_move = state.last_move
+        gt_move = moves[move_no]
+        if pred_move == gt_move:
+            correct += 1
+        else:
+            error = f'Predicted {pred_move} on move {move_no} at frame {frame} instead of {gt_move}'
 
 
 def main():
@@ -33,31 +58,13 @@ def main():
     state = State(video_config.fen)
     clear_dir('debug')
 
-    correct = 0
-    error = None
     infer_queue = AsyncInferQueue(detector.model, 2)
     infer_queue.set_callback(callback)
-    with tqdm(total=len(video_config.moves), desc='Move') as pbar:
-        for image, frame in tqdm(video, desc='Frame'):
-            detections = detector.run(image)
-            tracks = tracker.update(detections)
-            state.update(tracks)
-            if state.change:
-                pbar.update(1)
-                image = Image.fromarray(image)
-                image = visualizer.add_bboxes(image, tracks, video.new_keypoints)
-                image = visualizer.add_board(image, state)
-                image.save(os.path.join('debug', f'{frame}.jpg'))
-                move_no = state.board.ply() - 1
-                pred_move = state.last_move
-                gt_move = video_config.moves[move_no]
-                if pred_move == gt_move:
-                    correct += 1
-                else:
-                    error = f'Predicted {pred_move} on move {move_no} at frame {frame} instead of {gt_move}'
-                    break
-                if move_no == len(video_config.moves) - 1:
-                    break
+    for image, frame in tqdm(video, desc='Frame'):
+        infer_queue.start_async({detector.input_layer_ir.any_name: Tensor(np.expand_dims(image, axis=0))},
+                                (detector, tracker, state, visualizer, image, frame, video_config.moves))
+
+    infer_queue.wait_all()
     if error is not None:
         print(error)
     print(f'{correct}/{len(video_config.moves)} moves were tracked correctly')
