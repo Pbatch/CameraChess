@@ -1,4 +1,3 @@
-import os
 from collections import namedtuple
 
 import numpy as np
@@ -6,7 +5,7 @@ from scipy.spatial import KDTree
 from ultralytics.tracker import BYTETracker
 from ultralytics.yolo.utils import IterableSimpleNamespace
 
-from camera_chess.constants import CLASSES, SQUARE_SIZE, ROOT_DIR
+from camera_chess.constants import CLASSES, SQUARE_SIZE
 from camera_chess.utils import warp, get_square
 
 Track = namedtuple("Track", "piece center square score bbox speed")

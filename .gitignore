@@ -5,6 +5,7 @@ debug
 blender
 models
 .idea/
+camera_chess/aws
 
 *.tar.gz
 *.jpg

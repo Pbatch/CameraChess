@@ -8,8 +8,6 @@ STUDIO_LABEL_DIR = os.path.join(STUDIO_DIR, 'files', 'labels')
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 YOLO_DIR = os.path.join(DATA_DIR, 'yolo')
 
-CLASSES = ['black-bishop', 'black-king', 'black-knight', 'black-pawn', 'black-queen', 'black-rook',
-           'white-bishop', 'white-king', 'white-knight', 'white-pawn', 'white-queen', 'white-rook']
 CLASS_TO_PIECE = {'black-bishop': chess.Piece(chess.BISHOP, chess.BLACK),
                   'black-king': chess.Piece(chess.KING, chess.BLACK),
                   'black-knight': chess.Piece(chess.KNIGHT, chess.BLACK),
@@ -23,6 +21,7 @@ CLASS_TO_PIECE = {'black-bishop': chess.Piece(chess.BISHOP, chess.BLACK),
                   'white-queen': chess.Piece(chess.QUEEN, chess.WHITE),
                   'white-rook': chess.Piece(chess.ROOK, chess.WHITE)}
 PIECE_TO_CLASS = {v: k for k, v in CLASS_TO_PIECE.items()}
+CLASSES = list(CLASS_TO_PIECE.keys())
 CORNERS = ['h1', 'a1', 'a8', 'h8']
 SQUARE_SIZE = 128
 BOARD_SIZE = 8 * SQUARE_SIZE

@@ -11,7 +11,10 @@ from camera_chess.constants import PIECE_TO_CLASS, CLASSES
 
 
 class State:
-    def __init__(self, fen, move_thresh=0.0, speed_thresh=1.0):
+    def __init__(self,
+                 fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 move_thresh=0.0,
+                 speed_thresh=1.0):
         self.fen = fen
         self.move_thresh = move_thresh
         self.speed_thresh = speed_thresh
