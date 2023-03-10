@@ -1,11 +1,9 @@
 import os
 from glob import glob
 
-import cv2
 import nncf
 import numpy as np
 from PIL import Image
-
 from openvino.runtime import Core, serialize
 from torch.utils.data import Dataset, DataLoader
 
@@ -64,7 +62,7 @@ def default_quantization(model_path):
 
 
 def main():
-    model_path = 'models/480S-sim.xml'
+    model_path = 'models/480S.xml'
     default_quantization(model_path)
 
 

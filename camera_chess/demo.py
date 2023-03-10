@@ -1,6 +1,7 @@
 import os
 
 from PIL import Image
+from openvino.runtime import AsyncInferQueue
 from tqdm import tqdm
 
 from camera_chess.detector import Detector
@@ -11,12 +12,17 @@ from camera_chess.video import Video
 from camera_chess.visualizer import Visualizer
 
 
+def callback():
+    pass
+
+
 def main():
-    dataset = 'peter/melgosa_zuluaga'
+    dataset = 'youtube/carlsen_vidit'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
-    detector = Detector(model_path='models/480S.onnx',
+    detector = Detector(model_path='models/480S-quant.xml',
+                        weights_path='models/480S-quant.bin',
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,
                       keypoints=video.new_keypoints,
@@ -29,6 +35,8 @@ def main():
 
     correct = 0
     error = None
+    infer_queue = AsyncInferQueue(detector.model, 2)
+    infer_queue.set_callback(callback)
     with tqdm(total=len(video_config.moves), desc='Move') as pbar:
         for image, frame in tqdm(video, desc='Frame'):
             detections = detector.run(image)

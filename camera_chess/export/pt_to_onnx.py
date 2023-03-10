@@ -1,8 +1,6 @@
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision
-from PIL import Image
 from torch import nn
 from ultralytics.nn.modules import Detect, C2f
 
@@ -92,7 +90,7 @@ class WrappedModel(nn.Module):
         return y
 
 
-def _load_model(model_path):
+def load_model(model_path):
     model = torch.load(model_path, map_location='cpu')['model']
     for p in model.parameters():
         p.requires_grad = False
@@ -110,7 +108,7 @@ def _load_model(model_path):
     return wrapped_model
 
 
-def _export(model, save_path):
+def export(model, save_path):
     image = torch.randint(0, 256, (1, 400, 500, 3), dtype=torch.uint8)
     dynamic = {'image': {0: 'batch', 1: 'height', 2: 'width'},
                'output0': {0: 'batch', 1: 'anchors'}}
@@ -118,30 +116,17 @@ def _export(model, save_path):
                       args=image.cpu(),
                       f=save_path,
                       verbose=False,
+                      opset_version=16,
                       do_constant_folding=True,
                       input_names=['image'],
                       output_names=['output0'],
                       dynamic_axes=dynamic)
 
-    url = "https://convertmodel.com/#input=onnx&output=onnx"
-    print(f'Go to {url} for simplify the model')
-
-
-def _test(model):
-    image = torch.tensor(np.array(Image.open('data/google/images/1.jpg'))).unsqueeze(dim=0)
-    preprocessed_image = model._preprocess(image)
-    np_image = (preprocessed_image[0] * 255).numpy().astype(np.uint8).transpose((1, 2, 0))
-    res = model(image)
-
-    print(res.shape)
-    Image.fromarray(np_image).show()
-
 
 def main():
     model_path = 'models/480S.pt'
-    model = _load_model(model_path)
-    _export(model, 'models/480S.onnx')
-    # _test(model)
+    model = load_model(model_path)
+    export(model, 'models/480S.onnx')
 
 
 if __name__ == '__main__':

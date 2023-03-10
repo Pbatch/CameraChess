@@ -1,19 +1,26 @@
 from collections import namedtuple
 
 import numpy as np
-import onnxruntime
+from openvino.runtime import Core, Tensor
 
 Detections = namedtuple("Detections", "xyxy conf cls")
 
 
 class Detector:
-    def __init__(self, model_path, keypoints):
-        self.model_path = model_path
+    def __init__(self, keypoints, model_path, weights_path=''):
         self.keypoints = keypoints
+        self.model_path = model_path
+        self.weights_path = weights_path
 
-        self.sess = onnxruntime.InferenceSession(self.model_path)
-        self.output_name = self.sess.get_outputs()[0].name
-        self.input_name = self.sess.get_inputs()[0].name
+        model = Core().read_model(model=self.model_path,
+                                  weights=self.weights_path)
+        self.model = Core().compile_model(model=model, device_name="CPU")
+        self.input_layer_ir = self.model.input(0)
+        self.infer_request = self.model.create_infer_request()
+
+    @staticmethod
+    def callback(infer_request):
+        return infer_request.get_output_tensor(0).data
 
     def _filter_by_roi(self, pred):
         piece_centers = np.vstack([(pred[:, 0] + pred[:, 2]) / 2,
@@ -28,7 +35,9 @@ class Detector:
         return pred
 
     def run(self, image: np.ndarray):
-        pred = self.sess.run([self.output_name], {self.input_name: np.expand_dims(image, axis=0)})[0]
+        self.infer_request.set_tensor(self.input_layer_ir, Tensor(np.expand_dims(image, axis=0)))
+        self.infer_request.infer()
+        pred = self.infer_request.get_output_tensor(0).data
         pred = self._filter_by_roi(pred)
 
         detections = Detections(pred[:, :4], pred[:, 4], pred[:, 5].astype(int))
