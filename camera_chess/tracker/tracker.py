@@ -2,8 +2,7 @@ from collections import namedtuple
 
 import numpy as np
 from scipy.spatial import KDTree
-from ultralytics.tracker import BYTETracker
-from ultralytics.yolo.utils import IterableSimpleNamespace
+from camera_chess.tracker.byte_tracker import BYTETracker
 
 from camera_chess.constants import CLASSES, SQUARE_SIZE
 from camera_chess.utils import warp, get_square
@@ -21,12 +20,11 @@ class Tracker:
         self.fps = fps
         self.keypoints = keypoints
 
-        args = {'track_high_thresh': track_high_thresh,
-                'track_low_thresh': track_low_thresh,
-                'new_track_thresh': new_track_thresh,
-                'track_buffer': track_buffer,
-                'match_thresh': match_thresh}
-        self.tracker = BYTETracker(IterableSimpleNamespace(**args),
+        self.tracker = BYTETracker(track_high_thresh=track_high_thresh,
+                                   track_low_thresh=track_low_thresh,
+                                   new_track_thresh=new_track_thresh,
+                                   track_buffer=track_buffer,
+                                   match_thresh=match_thresh,
                                    frame_rate=self.fps)
 
         grid = (np.mgrid[0:8, 0:8].reshape(2, -1).T + 0.5) * SQUARE_SIZE

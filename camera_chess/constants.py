@@ -37,3 +37,12 @@ COLOUR_MAP = {'black-pawn': 'white',
               'white-king': 'black',
               'black-queen': 'grey',
               'white-queen': 'grey'}
+
+"""
+Lichess Board API
+"""
+# username = "cameraboard1"
+LICHESS_TOKEN_1 = "lip_mYMY7izVDkuUnIssVYxE"
+
+# username = "cameraboard2"
+LICHESS_TOKEN_2 = "lip_w1lKuk3GbV7eHjo0KFXL"

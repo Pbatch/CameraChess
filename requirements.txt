@@ -13,3 +13,4 @@ requests
 websockets
 torch
 nncf
+berserk

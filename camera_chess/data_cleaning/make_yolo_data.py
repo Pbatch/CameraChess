@@ -24,7 +24,8 @@ def main(image_size, train_fraction, max_split_size):
     roboflow_datasets = ['1', '2', '3', '4', '5']
     peter_datasets = ['smothered_mate', 'scholars_mate', 'kasparov_immortal',
                       'peter_emma', 'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
-                      'melgosa_zuluaga']
+                      'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',
+                      'tal_sviridov', 'larsen_spassky', 'furman_spassky', 'wells_speelman']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('peter', s) for s in peter_datasets])
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])

@@ -1,4 +1,5 @@
 import os
+import pickle
 import shutil
 from collections import namedtuple
 from glob import glob
@@ -61,3 +62,11 @@ def warp(src, keypoints):
     inv_matrix = np.linalg.inv(matrix)
     warped_src = cv2.perspectiveTransform(np.expand_dims(src, axis=0), inv_matrix)[0]
     return warped_src
+
+
+def serialize(obj):
+    return pickle.dumps(obj).decode("ISO-8859-1")
+
+
+def deserialize(s):
+    return pickle.loads(s.encode("ISO-8859-1"))

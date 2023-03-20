@@ -8,12 +8,12 @@ from tqdm import tqdm
 
 from camera_chess.detector import Detector, Detections
 from camera_chess.state import State
-from camera_chess.tracker import Tracker
+from camera_chess.tracker.tracker import Tracker
 from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.video import Video
 from camera_chess.visualizer import Visualizer
 
-error = None
+error = ''
 correct = 0
 
 
@@ -23,28 +23,31 @@ def callback(infer_request, info):
     global correct
 
     pred = infer_request.get_output_tensor(0).data
-    pred = detector._filter_by_roi(pred)
+    pred = detector.filter_by_roi(pred)
     detections = Detections(pred[:, :4], pred[:, 4], pred[:, 5].astype(int))
     tracks = tracker.update(detections)
     state.update(tracks)
-    if state.change:
+    if state.change or np.random.random() < 0.0:
         image = Image.fromarray(image)
         image = visualizer.add_bboxes(image, tracks, detector.keypoints)
         image = visualizer.add_board(image, state)
         image.save(os.path.join('debug', f'{frame}.jpg'))
+    if state.change:
         move_no = state.board.ply() - 1
         pred_move = state.last_move
         gt_move = moves[move_no]
         if pred_move == gt_move:
             correct += 1
         else:
-            error = f'Predicted {pred_move} on move {move_no} at frame {frame} instead of {gt_move}'
+            error += f'\nPredicted {pred_move} on move {move_no} at frame {frame} instead of {gt_move}'
+            print(error)
+            exit(1)
 
 
 def main():
-    dataset = 'youtube/carlsen_vidit'
+    dataset = 'youtube/levi_rensch'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=8)
+    video = Video(video_config, target_fps=30)
     video.save_start_image()
     detector = Detector(model_path='models/480S-quant.xml',
                         weights_path='models/480S-quant.bin',
@@ -65,7 +68,7 @@ def main():
                                 (detector, tracker, state, visualizer, image, frame, video_config.moves))
 
     infer_queue.wait_all()
-    if error is not None:
+    if len(error):
         print(error)
     print(f'{correct}/{len(video_config.moves)} moves were tracked correctly')
 

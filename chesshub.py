@@ -18,9 +18,8 @@ from camera_chess.visualizer import Visualizer
 # https://ChessVisualiserApi20230221132052.azurewebsites.net/chesshub => remote connection string (wss instead of ws)
 
 negotiation = requests.post('http://localhost:7272/chesshub/negotiate?negotiateVersion=0').json()
-detector = Detector(model_path='models/480S-sim-quant.xml',
-                    weights_path='models/480S-sim-quant.bin',
-                    conf_thres=0.1,
+detector = Detector(model_path='models/480S-quant.xml',
+                    weights_path='models/480S-quant.bin',
                     keypoints=np.array([[0, 0], [0, 1], [1, 1], [1, 0]], dtype=np.float32))
 
 visualizer = Visualizer()
@@ -89,7 +88,7 @@ async def connect_to_chess_hub(connection_id):
             state = State(fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
             tracker = Tracker(fps=1,
                               keypoints=keypoints,
-                              track_low_thresh=detector.conf_thres)
+                              track_low_thresh=0.1)
             detections = detector.run(np.array(image))
             tracks = tracker.update(detections)
             state.update(tracks)

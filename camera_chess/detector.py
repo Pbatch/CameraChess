@@ -23,7 +23,7 @@ class Detector:
     def callback(infer_request):
         return infer_request.get_output_tensor(0).data
 
-    def _filter_by_roi(self, pred):
+    def filter_by_roi(self, pred):
         piece_centers = np.vstack([(pred[:, 0] + pred[:, 2]) / 2,
                                    pred[:, 3] - ((pred[:, 2] - pred[:, 0]) / 4)]).T
         mask = np.ones(len(piece_centers), dtype=bool)
@@ -39,7 +39,7 @@ class Detector:
         self.infer_request.set_tensor(self.input_layer_ir, Tensor(np.expand_dims(image, axis=0)))
         self.infer_request.infer()
         pred = self.infer_request.get_output_tensor(0).data
-        pred = self._filter_by_roi(pred)
+        pred = self.filter_by_roi(pred)
 
         detections = Detections(pred[:, :4], pred[:, 4], pred[:, 5].astype(int))
         return detections

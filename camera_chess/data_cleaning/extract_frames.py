@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from camera_chess.constants import CORNERS, PIECE_TO_CLASS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR
 from camera_chess.detector import Detector
-from camera_chess.tracker import Tracker
+from camera_chess.tracker.tracker import Tracker
 from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.video import Video
 
@@ -17,7 +17,8 @@ def main():
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    dataset = 'peter/bronstein_teschner'
+    dataset = 'peter/wells_speelman'
+    overwrite = True
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     keypoints_template = {'original_width': video.width,
@@ -34,15 +35,14 @@ def main():
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    detector = Detector(model_path='models/480S-sim-quant.xml',
-                        weights_path='models/480S-sim-quant.bin',
-                        conf_thres=0.1,
+    detector = Detector(model_path='models/480S-quant.xml',
+                        weights_path='models/480S-quant.bin',
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,
                       keypoints=video.new_keypoints,
-                      track_high_thresh=0.2,
-                      new_track_thresh=0.2,
-                      track_low_thresh=detector.conf_thres)
+                      track_high_thresh=0.6,
+                      new_track_thresh=0.3,
+                      track_low_thresh=0.3)
     board = chess.Board(fen=video_config.fen)
 
     move_idx = 0
@@ -72,7 +72,11 @@ def main():
                            'from_name': 'bbox-1',
                            'to_name': 'img-1',
                            'type': 'rectanglelabels'}
+
+        used = set()
         for track in tracks:
+            if track.square in used:
+                continue
             x = 100 * track.bbox[0] / video.width
             y = 100 * track.bbox[1] / video.height
             w = 100 * (track.bbox[2] - track.bbox[0]) / video.width
@@ -80,11 +84,15 @@ def main():
             label = labels_template.copy()
 
             # Use the board to overwrite the piece classification
-            square = chess.parse_square(track.square)
-            piece = board.piece_at(square)
-            if piece is None:
-                continue
-            piece = PIECE_TO_CLASS[piece]
+            if overwrite:
+                square = chess.parse_square(track.square)
+                piece = board.piece_at(square)
+                if piece is None:
+                    continue
+                piece = PIECE_TO_CLASS[piece]
+            else:
+                piece = track.piece
+            used.add(track.square)
 
             label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [piece]}
             d['annotations'][0]['result'].append(label)
