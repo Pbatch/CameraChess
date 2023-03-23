@@ -2,14 +2,8 @@
 
 ## TODO
 
-* Label more diverse chess sets
-* Make ROI less severe
 * Fix chesshub script
-* Use Lichess Board API instead of Bot API
-  * Make 2 new emails
-  * Make 2 new camera chess accounts
-  * Check API calls are similar
-  * Try 1vs1 match
+* Finish single piece labelling from harsh angles
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog
