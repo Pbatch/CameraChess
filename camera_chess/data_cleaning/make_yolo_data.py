@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import random
+import shutil
 import subprocess
 from glob import glob
 
@@ -30,6 +31,7 @@ def main(image_size, train_fraction, max_split_size):
     datasets.extend([os.path.join('peter', s) for s in peter_datasets])
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
     datasets.extend([os.path.join('roboflow', s) for s in roboflow_datasets])
+    datasets = []
     for dataset in datasets:
         label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
         if len(label_paths) > max_split_size:
@@ -81,6 +83,19 @@ def main(image_size, train_fraction, max_split_size):
             new_label_path = os.path.join(YOLO_DIR, split, 'labels', f'{id_}.txt')
             with open(new_label_path, 'w') as f:
                 f.write('\n'.join(output))
+
+    pieces = ['white-rook']
+    for piece in pieces:
+        piece_dir = os.path.join(DATA_DIR, 'single_piece', piece)
+        for i, image_path in enumerate(glob(os.path.join(piece_dir, 'images', '*.jpg'))):
+            id_ = f'single_piece_{piece}_{os.path.splitext(os.path.basename(image_path))[0]}'
+            label_path = os.path.join(piece_dir, 'labels', f'{os.path.splitext(os.path.basename(image_path))[0]}.txt')
+
+            new_image_path = os.path.join(YOLO_DIR, 'train', 'images', f'{id_}.jpg')
+            new_label_path = os.path.join(YOLO_DIR, 'train', 'labels', f'{id_}.txt')
+
+            shutil.copyfile(image_path, new_image_path)
+            shutil.copyfile(label_path, new_label_path)
 
     subprocess.call(['tar', '-czf', 'yolo.tar.gz', 'yolo'], cwd=DATA_DIR)
 
