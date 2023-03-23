@@ -36,7 +36,7 @@ class Visualizer:
                     x + radius, y + radius]
             d.ellipse(bbox, fill=colour)
 
-    def add_bboxes(self, image, tracks, keypoints):
+    def add_bboxes(self, image, tracks, keypoints=None):
         image = image.copy()
 
         d = ImageDraw.Draw(image)
@@ -56,7 +56,8 @@ class Visualizer:
             text = ', '.join(text_items)
             self._draw_text(d, bbox, text)
 
-        self._draw_points(d, keypoints, 'black')
+        if keypoints is not None:
+            self._draw_points(d, keypoints, 'black')
 
         return image
 
