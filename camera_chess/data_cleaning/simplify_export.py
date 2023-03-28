@@ -1,25 +1,30 @@
 import json
 import os
+import time
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from camera_chess.constants import DATA_DIR
+from camera_chess.visualizer import Visualizer
 
 
 def main():
-    export_id = 'project-1-at-2023-03-17-18-11-ec17d648'
-    dataset = 'peter/wells_speelman'
+    export_id = 'project-1-at-2023-03-28-17-16-aeaa509e'
+    dataset = 'single_piece/white-rook'
+    verbose = False
+    visualizer = Visualizer()
     with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:
         labels = json.load(f)
 
-    os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'))
-    os.makedirs(os.path.join(DATA_DIR, dataset, 'images'))
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'images'), exist_ok=True)
     for i, label in enumerate(labels):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
         for annotation in label['annotations'][0]['result']:
-            value, width, height, type_ = [annotation[s] for s in ['value', 'original_width',
-                                                                   'original_height', 'type']]
+            value = annotation['value']
+            type_ = annotation['type']
+
             if type_ == 'keypointlabels':
                 key = value['keypointlabels'][0]
                 x = float(value['x']) / 100
@@ -30,6 +35,8 @@ def main():
                 bbox = [class_] + [float(value[s]) / 100 for s in ['x', 'y', 'width', 'height']]
                 new_label['bboxes'].append(bbox)
 
+        if all([len(v) == 0 for v in new_label['keypoints'].values()]):
+            new_label.pop('keypoints')
         new_label_path = f'data/{dataset}/labels/{i}.json'
         with open(new_label_path, 'w') as f:
             json.dump(new_label, f, indent=4)
@@ -39,6 +46,11 @@ def main():
         image = image.convert('RGB')
         new_image_path = f'data/{dataset}/images/{i}.jpg'
         image.save(new_image_path)
+
+        if verbose:
+            image = Visualizer.add_bboxes(image, new_label['bboxes'])
+            image.show()
+            time.sleep(1)
 
 
 if __name__ == '__main__':

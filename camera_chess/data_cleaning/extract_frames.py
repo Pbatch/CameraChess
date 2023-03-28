@@ -17,10 +17,10 @@ def main():
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    dataset = 'peter/wells_speelman'
+    dataset = 'peter/keres_szabo'
     overwrite = True
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=8)
+    video = Video(video_config, target_fps=4)
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
                           'from_name': 'kp-1',

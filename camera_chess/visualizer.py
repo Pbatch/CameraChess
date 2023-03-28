@@ -36,7 +36,7 @@ class Visualizer:
                     x + radius, y + radius]
             d.ellipse(bbox, fill=colour)
 
-    def add_bboxes(self, image, tracks, keypoints=None):
+    def add_bboxes_from_tracks(self, image, tracks, keypoints=None):
         image = image.copy()
 
         d = ImageDraw.Draw(image)
@@ -58,6 +58,21 @@ class Visualizer:
 
         if keypoints is not None:
             self._draw_points(d, keypoints, 'black')
+
+        return image
+
+    @staticmethod
+    def add_bboxes(image, bboxes):
+        image = image.copy()
+        width, height = image.width, image.height
+
+        d = ImageDraw.Draw(image)
+        for piece, x, y, w, h in bboxes:
+            ltrb = [x * width,
+                    y * height,
+                    (x + w) * width,
+                    (y + h) * height]
+            d.rectangle(tuple(ltrb), width=5, outline=COLOUR_MAP[piece])
 
         return image
 

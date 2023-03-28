@@ -27,7 +27,7 @@ def callback(infer_request, info):
     detections = Detections(pred[:, :4], pred[:, 4], pred[:, 5].astype(int))
     tracks = tracker.update(detections)
     state.update(tracks)
-    if state.change or np.random.random() < 0.0:
+    if state.change or np.random.random() < 1.0:
         image = Image.fromarray(image)
         image = visualizer.add_bboxes(image, tracks, detector.keypoints)
         image = visualizer.add_board(image, state)
@@ -45,9 +45,9 @@ def callback(infer_request, info):
 
 
 def main():
-    dataset = 'youtube/levi_rensch'
+    dataset = 'peter/keres_szabo'
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=30)
+    video = Video(video_config, target_fps=4)
     video.save_start_image()
     detector = Detector(model_path='models/480S-quant.xml',
                         weights_path='models/480S-quant.bin',

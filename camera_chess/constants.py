@@ -46,3 +46,9 @@ LICHESS_TOKEN_1 = "lip_mYMY7izVDkuUnIssVYxE"
 
 # username = "cameraboard2"
 LICHESS_TOKEN_2 = "lip_w1lKuk3GbV7eHjo0KFXL"
+
+# username = "tom24008"
+LICHESS_TOKEN_TOM = "lip_qqlkc4ArNe0WuXM7JLxQ"
+
+# username = "blindfoldblunderer"
+LICHESS_TOKEN_PETER = "lip_3Km8pHjYCeNkTRL7HODE"

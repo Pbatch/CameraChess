@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import random
-import shutil
 import subprocess
 from glob import glob
 
@@ -27,11 +26,13 @@ def main(image_size, train_fraction, max_split_size):
                       'peter_emma', 'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
                       'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',
                       'tal_sviridov', 'larsen_spassky', 'furman_spassky', 'wells_speelman']
+    single_piece_datasets = ['white-rook', 'black-rook', 'white-knight']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('peter', s) for s in peter_datasets])
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
     datasets.extend([os.path.join('roboflow', s) for s in roboflow_datasets])
     datasets = []
+    datasets.extend([os.path.join('single_piece', s) for s in single_piece_datasets])
     for dataset in datasets:
         label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
         if len(label_paths) > max_split_size:
@@ -43,16 +44,26 @@ def main(image_size, train_fraction, max_split_size):
             image_path = label_path.replace('labels', 'images').replace('.json', '.jpg')
             image = Image.open(image_path)
 
-            keypoints = np.array(list(label['keypoints'].values()))
+            try:
+                keypoints = np.array(list(label['keypoints'].values()))
+            except KeyError:
+                keypoints = None
             pieces = [bbox[0] for bbox in label['bboxes']]
             bboxes = np.array([bbox[1:] for bbox in label['bboxes']])
 
-            keypoints[:, 0] *= image.width
-            keypoints[:, 1] *= image.height
-            x_min = keypoints[:, 0].min()
-            y_min = keypoints[:, 1].min()
-            x_max = keypoints[:, 0].max()
-            y_max = keypoints[:, 1].max()
+            if keypoints is not None:
+                keypoints[:, 0] *= image.width
+                keypoints[:, 1] *= image.height
+                x_min = keypoints[:, 0].min()
+                y_min = keypoints[:, 1].min()
+                x_max = keypoints[:, 0].max()
+                y_max = keypoints[:, 1].max()
+            else:
+                x_min = 0
+                y_min = 0
+                x_max = image.width
+                y_max = image.height
+
             if len(bboxes):
                 bboxes[:, [0, 2]] *= image.width
                 bboxes[:, [1, 3]] *= image.height
@@ -83,19 +94,6 @@ def main(image_size, train_fraction, max_split_size):
             new_label_path = os.path.join(YOLO_DIR, split, 'labels', f'{id_}.txt')
             with open(new_label_path, 'w') as f:
                 f.write('\n'.join(output))
-
-    pieces = ['white-rook']
-    for piece in pieces:
-        piece_dir = os.path.join(DATA_DIR, 'single_piece', piece)
-        for i, image_path in enumerate(glob(os.path.join(piece_dir, 'images', '*.jpg'))):
-            id_ = f'single_piece_{piece}_{os.path.splitext(os.path.basename(image_path))[0]}'
-            label_path = os.path.join(piece_dir, 'labels', f'{os.path.splitext(os.path.basename(image_path))[0]}.txt')
-
-            new_image_path = os.path.join(YOLO_DIR, 'train', 'images', f'{id_}.jpg')
-            new_label_path = os.path.join(YOLO_DIR, 'train', 'labels', f'{id_}.txt')
-
-            shutil.copyfile(image_path, new_image_path)
-            shutil.copyfile(label_path, new_label_path)
 
     subprocess.call(['tar', '-czf', 'yolo.tar.gz', 'yolo'], cwd=DATA_DIR)
 

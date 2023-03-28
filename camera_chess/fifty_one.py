@@ -10,16 +10,17 @@ from camera_chess.constants import DATA_DIR
 def load_label_studio():
     samples = []
     keypoint_order = ['h1', 'a1', 'a8', 'h8']
-    for dataset in ['peter/kasparov_immortal']:
+    for dataset in ['single_piece/white-rook']:
         for image_path in glob(os.path.join(DATA_DIR, dataset, 'images', '*')):
             sample = fo.Sample(filepath=image_path)
 
             label_path = image_path.replace('images', 'labels').replace('.jpg', '.json')
             with open(label_path, 'r') as f:
                 label = json.load(f)
-            keypoints = [fo.Keypoint(label="board",
-                                     points=[label['keypoints'][s] for s in keypoint_order])]
-            sample["keypoints"] = fo.Keypoints(keypoints=keypoints)
+            if 'keypoints' in label:
+                keypoints = [fo.Keypoint(label="board",
+                                         points=[label['keypoints'][s] for s in keypoint_order])]
+                sample["keypoints"] = fo.Keypoints(keypoints=keypoints)
 
             detections = [fo.Detection(label=label, bounding_box=bbox)
                           for label, *bbox in label['bboxes']]

@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -6,7 +7,7 @@ from decord import VideoReader
 from openvino.runtime import Tensor
 from tqdm import tqdm
 
-from camera_chess.constants import DATA_DIR, CLASSES
+from camera_chess.constants import DATA_DIR, CLASSES, STUDIO_LABEL_DIR, STUDIO_IMAGE_DIR
 from camera_chess.detector import Detector
 from camera_chess.utils import clear_dir
 
@@ -34,6 +35,9 @@ class SinglePieceVideo:
 
 
 def main():
+    clear_dir(STUDIO_IMAGE_DIR)
+    clear_dir(STUDIO_LABEL_DIR)
+
     piece = 'white-rook'
     piece_dir = os.path.join(DATA_DIR, 'single_piece', piece)
     image_dir = os.path.join(piece_dir, 'images')
@@ -43,32 +47,48 @@ def main():
     video = SinglePieceVideo(path)
     detector = Detector(model_path='models/480S-quant.xml',
                         weights_path='models/480S-quant.bin',
-                        keypoints=np.array([[0, 0], [0, 1000], [1000, 1000], [1000, 0]], dtype=np.float32))
+                        keypoints=np.array([[0, 0], [0, 2000], [2000, 2000], [2000, 0]], dtype=np.float32))
     clear_dir(image_dir)
     clear_dir(label_dir)
 
-    class_id = CLASSES.index(piece)
+    labels_template = {'from_name': 'bbox-1',
+                       'to_name': 'img-1',
+                       'type': 'rectanglelabels'}
     for image, frame in tqdm(video):
+        d = {'data': {'img': f'/data/local-files/?d=images/{frame}.jpg'},
+             'annotations': [{
+                 'result': []
+             }]}
+
+        new_image_path = os.path.join(STUDIO_IMAGE_DIR, f'{frame}.jpg')
+        Image.fromarray(image).save(new_image_path)
+
         detector.infer_request.set_tensor(detector.input_layer_ir, Tensor(np.expand_dims(image, axis=0)))
         detector.infer_request.infer()
         pred = detector.infer_request.get_output_tensor(0).data
-        if len(pred) == 0:
-            continue
-        best_pred = max(pred, key=lambda x: x[4])
-        conf = best_pred[4]
-        if conf < 0.2:
-            continue
-        bbox = best_pred[:4]
-        height, width = image.shape[:2]
+        if len(pred) > 0:
+            best_pred = max(pred, key=lambda x: x[4])
+            bbox = best_pred[:4]
+            height, width = image.shape[:2]
+
+            x = 100 * bbox[0] / width
+            y = 100 * bbox[1] / height
+            w = 100 * (bbox[2] - bbox[0]) / width
+            h = 100 * (bbox[3] - bbox[1]) / height
+            label = labels_template.copy()
+            label['original_width'] = width
+            label['original_height'] = height
+            label['value'] = {'x': x,
+                              'y': y,
+                              'width': w,
+                              'height': h,
+                              'rectanglelabels': [piece]}
+            d['annotations'][0]['result'].append(label)
+
+        with open(os.path.join(STUDIO_LABEL_DIR, f'{frame}.json'), 'w') as f:
+            json.dump(d, f, indent=4)
 
         Image.fromarray(image).save(os.path.join(image_dir, f'{frame}.jpg'))
-        with open(os.path.join(label_dir, f'{frame}.txt'), 'w') as f:
-            xc = (bbox[0] + bbox[2]) / (2 * width)
-            yc = (bbox[1] + bbox[3]) / (2 * height)
-            w = (bbox[2] - bbox[0]) / width
-            h = (bbox[3] - bbox[1]) / height
-
-            f.write(f'{class_id} {xc} {yc} {w} {h}')
 
 
 if __name__ == '__main__':
