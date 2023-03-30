@@ -11,7 +11,7 @@ from PIL import Image
 
 from camera_chess.detector import Detector
 from camera_chess.state import State
-from camera_chess.tracker import Tracker
+from camera_chess.tracker.tracker import Tracker
 from camera_chess.visualizer import Visualizer
 
 # http://localhost:7272/chesshub => local connection string
@@ -46,6 +46,28 @@ def obj_to_bytes(obj):
     return pickle.dumps(obj).decode("ISO-8859-1")
 
 
+def bytes_to_obj(bytes):
+    return pickle.loads(bytes.encode("ISO-8859-1"))
+
+
+def load_state(latest_state):
+    if len(latest_state):
+        state = bytes_to_obj(latest_state)
+    else:
+        state = State(fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    return state
+
+
+def load_tracker(latest_tracker, keypoints):
+    if len(latest_tracker):
+        tracker = bytes_to_obj(latest_tracker)
+    else:
+        tracker = Tracker(fps=1,
+                          keypoints=keypoints,
+                          track_low_thresh=0.1)
+    return tracker
+
+
 async def connect_to_chess_hub(connection_id):
     uri = f"ws://localhost:7272/chesshub?id={connection_id}"
     async with websockets.connect(uri) as websocket:
@@ -74,31 +96,28 @@ async def connect_to_chess_hub(connection_id):
         async def process_image(d):
             data = json.loads(d[:-1])
             image_data = json.loads(data['arguments'][0])
+
             image = bytes_to_image(image_data['Image'])
-            try:
-                keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']],
-                                     dtype=np.float32)
-            except Exception as e:
-                print(e)
-                return str(e)
+            keypoints = np.array([image_data[s][12:].split(':') for s in ['H1', 'A1', 'A8', 'H8']],
+                                 dtype=np.float32)
             keypoints[..., 0] *= image.width
             keypoints[..., 1] *= image.height
+            state = load_state(image_data['LatestState'])
+            tracker = load_tracker(image_data['LatestTracker'], keypoints)
 
             detector.keypoints = keypoints
-            state = State(fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-            tracker = Tracker(fps=1,
-                              keypoints=keypoints,
-                              track_low_thresh=0.1)
             detections = detector.run(np.array(image))
             tracks = tracker.update(detections)
             state.update(tracks)
+            if state.change:
+                print(state.last_move)
 
-            image = visualizer.add_bboxes(image, tracks, keypoints)
+            image = visualizer.add_bboxes_from_tracks(image, tracks, keypoints)
             image = visualizer.add_board(image, state)
 
             output = {'image': image_to_bytes(image),
-                      'state': pickle.dumps(state).decode("ISO-8859-1"),
-                      'tracker': pickle.dumps(tracker).decode("ISO-8859-1")}
+                      'state': obj_to_bytes(state),
+                      'tracker': obj_to_bytes(tracker)}
 
             await send_image_processed(json.dumps(output))
 
