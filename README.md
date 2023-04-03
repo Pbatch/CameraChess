@@ -2,8 +2,8 @@
 
 ## TODO
 
-* Fix chesshub script
-* Finish single piece labelling from harsh angles
+* Fix AWS stuff (swap tracker to Scipy version)
+* Try some more TFLite stuff
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

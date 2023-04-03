@@ -29,7 +29,7 @@ def callback(infer_request, info):
     state.update(tracks)
     if state.change or np.random.random() < 1.0:
         image = Image.fromarray(image)
-        image = visualizer.add_bboxes(image, tracks, detector.keypoints)
+        image = visualizer.add_bboxes_from_tracks(image, tracks, detector.keypoints)
         image = visualizer.add_board(image, state)
         image.save(os.path.join('debug', f'{frame}.jpg'))
     if state.change:
@@ -45,7 +45,7 @@ def callback(infer_request, info):
 
 
 def main():
-    dataset = 'peter/keres_szabo'
+    dataset = 'youtube/carlsen_abdu'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=4)
     video.save_start_image()
@@ -72,7 +72,7 @@ def main():
         print(error)
     print(f'{correct}/{len(video_config.moves)} moves were tracked correctly')
 
-    visualizer.create_video('debug', fps=1)
+    # visualizer.create_video('debug', fps=1)
 
 
 if __name__ == '__main__':

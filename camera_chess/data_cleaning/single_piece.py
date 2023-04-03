@@ -7,7 +7,7 @@ from decord import VideoReader
 from openvino.runtime import Tensor
 from tqdm import tqdm
 
-from camera_chess.constants import DATA_DIR, CLASSES, STUDIO_LABEL_DIR, STUDIO_IMAGE_DIR
+from camera_chess.constants import DATA_DIR, STUDIO_LABEL_DIR, STUDIO_IMAGE_DIR
 from camera_chess.detector import Detector
 from camera_chess.utils import clear_dir
 
@@ -38,18 +38,14 @@ def main():
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    piece = 'white-rook'
+    piece = 'black-bishop'
     piece_dir = os.path.join(DATA_DIR, 'single_piece', piece)
-    image_dir = os.path.join(piece_dir, 'images')
-    label_dir = os.path.join(piece_dir, 'labels')
 
     path = os.path.join(piece_dir, 'video.mp4')
     video = SinglePieceVideo(path)
     detector = Detector(model_path='models/480S-quant.xml',
                         weights_path='models/480S-quant.bin',
                         keypoints=np.array([[0, 0], [0, 2000], [2000, 2000], [2000, 0]], dtype=np.float32))
-    clear_dir(image_dir)
-    clear_dir(label_dir)
 
     labels_template = {'from_name': 'bbox-1',
                        'to_name': 'img-1',
@@ -87,8 +83,6 @@ def main():
 
         with open(os.path.join(STUDIO_LABEL_DIR, f'{frame}.json'), 'w') as f:
             json.dump(d, f, indent=4)
-
-        Image.fromarray(image).save(os.path.join(image_dir, f'{frame}.jpg'))
 
 
 if __name__ == '__main__':

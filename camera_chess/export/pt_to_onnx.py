@@ -24,7 +24,7 @@ class WrappedModel(nn.Module):
         height, width = x.shape[2:]
         ratio = height / width
         if ratio > 1:
-            height = self.image_size
+            height = self.image_size * ratio
             width = self.image_size / ratio
         else:
             height = ratio * height

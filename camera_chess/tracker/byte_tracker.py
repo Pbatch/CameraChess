@@ -41,24 +41,6 @@ class STrack(BaseTrack):
             stracks[i].mean = mean
             stracks[i].covariance = cov
 
-    @staticmethod
-    def multi_gmc(stracks, H=np.eye(2, 3)):
-        if len(stracks) > 0:
-            multi_mean = np.asarray([st.mean.copy() for st in stracks])
-            multi_covariance = np.asarray([st.covariance for st in stracks])
-
-            R = H[:2, :2]
-            R8x8 = np.kron(np.eye(4, dtype=float), R)
-            t = H[:2, 2]
-
-            for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
-                mean = R8x8.dot(mean)
-                mean[:2] += t
-                cov = R8x8.dot(cov).dot(R8x8.transpose())
-
-                stracks[i].mean = mean
-                stracks[i].covariance = cov
-
     def activate(self, kalman_filter, frame_id):
         """Start a new tracklet"""
         self.kalman_filter = kalman_filter
@@ -183,6 +165,7 @@ class BYTETracker:
         self.frame_id = 0
         self.max_time_lost = int(self.frame_rate / 30.0 * self.track_buffer)
         self.kalman_filter = self.get_kalmanfilter()
+        self.reset_id()
 
     def update(self, results, img=None):
         self.frame_id += 1
@@ -219,10 +202,6 @@ class BYTETracker:
         strack_pool = self.joint_stracks(tracked_stracks, self.lost_stracks)
         # Predict the current location with KF
         self.multi_predict(strack_pool)
-        if hasattr(self, 'gmc'):
-            warp = self.gmc.apply(img, dets)
-            STrack.multi_gmc(strack_pool, warp)
-            STrack.multi_gmc(unconfirmed, warp)
 
         dists = self.get_dists(strack_pool, detections)
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=self.match_thresh)
@@ -240,7 +219,6 @@ class BYTETracker:
         # association the untrack to the low score detections
         detections_second = self.init_track(dets_second, scores_second, cls_second, img)
         r_tracked_stracks = [strack_pool[i] for i in u_track if strack_pool[i].state == TrackState.Tracked]
-        # TODO
         dists = matching.iou_distance(r_tracked_stracks, detections_second)
         matches, u_track, u_detection_second = matching.linear_assignment(dists, thresh=0.5)
         for itracked, idet in matches:
@@ -291,21 +269,27 @@ class BYTETracker:
         self.removed_stracks.extend(removed_stracks)
         self.tracked_stracks, self.lost_stracks = self.remove_duplicate_stracks(self.tracked_stracks, self.lost_stracks)
 
-    def get_kalmanfilter(self):
+    @staticmethod
+    def get_kalmanfilter():
         return KalmanFilterXYAH()
 
-    def init_track(self, dets, scores, cls, img=None):
+    @staticmethod
+    def init_track(dets, scores, cls, img=None):
         return [STrack(xyxy, s, c) for (xyxy, s, c) in zip(dets, scores, cls)] if len(dets) else []  # detections
 
-    def get_dists(self, tracks, detections):
+    @staticmethod
+    def get_dists(tracks, detections):
         dists = matching.iou_distance(tracks, detections)
-        # TODO: mot20
-        # if not self.args.mot20:
         dists = matching.fuse_score(dists, detections)
         return dists
 
-    def multi_predict(self, tracks):
+    @staticmethod
+    def multi_predict(tracks):
         STrack.multi_predict(tracks)
+
+    @staticmethod
+    def reset_id():
+        STrack.reset_id()
 
     @staticmethod
     def joint_stracks(tlista, tlistb):

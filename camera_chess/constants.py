@@ -52,3 +52,6 @@ LICHESS_TOKEN_TOM = "lip_qqlkc4ArNe0WuXM7JLxQ"
 
 # username = "blindfoldblunderer"
 LICHESS_TOKEN_PETER = "lip_3Km8pHjYCeNkTRL7HODE"
+
+# username = "babyeatingbishop"
+LICHESS_TOKEN_CONOR = "lip_KHK4q3qAH5TFUfbX83zP"

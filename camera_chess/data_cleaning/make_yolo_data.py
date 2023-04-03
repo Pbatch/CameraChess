@@ -26,12 +26,13 @@ def main(image_size, train_fraction, max_split_size):
                       'peter_emma', 'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
                       'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',
                       'tal_sviridov', 'larsen_spassky', 'furman_spassky', 'wells_speelman']
-    single_piece_datasets = ['white-rook', 'black-rook', 'white-knight']
+    single_piece_datasets = ['white-rook', 'black-rook', 'white-queen', 'black-queen',
+                             'white-pawn', 'black-pawn', 'white-king', 'black-king',
+                             'white-bishop', 'black-bishop', 'white-knight', 'black-knight']
     datasets = ['google', 'chesscog']
     datasets.extend([os.path.join('peter', s) for s in peter_datasets])
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
     datasets.extend([os.path.join('roboflow', s) for s in roboflow_datasets])
-    datasets = []
     datasets.extend([os.path.join('single_piece', s) for s in single_piece_datasets])
     for dataset in datasets:
         label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))

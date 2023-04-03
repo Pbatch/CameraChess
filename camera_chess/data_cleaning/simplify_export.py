@@ -2,22 +2,22 @@ import json
 import os
 import time
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from camera_chess.constants import DATA_DIR
 from camera_chess.visualizer import Visualizer
 
 
 def main():
-    export_id = 'project-1-at-2023-03-28-17-16-aeaa509e'
-    dataset = 'single_piece/white-rook'
+    export_id = 'project-1-at-2023-03-31-17-17-ddc97973'
+    dataset = 'single_piece/black-bishop'
     verbose = False
     visualizer = Visualizer()
     with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:
         labels = json.load(f)
 
-    os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'), exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, dataset, 'images'), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'))
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'images'))
     for i, label in enumerate(labels):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
