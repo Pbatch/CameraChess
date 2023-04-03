@@ -1,6 +1,4 @@
-import lap
 import numpy as np
-from icecream import ic
 from scipy.optimize import linear_sum_assignment
 
 
