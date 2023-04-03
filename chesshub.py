@@ -82,13 +82,14 @@ while True:
                     print(f"handshake_response: {handshake_response}")
         
                 async def listen():
+                    _running = True
                     while _running:
                         try:
                             response = await websocket.recv()
-                        except websockets.ConnectionClosed as e:
-                            print(f'Connected closed: {e}')
-                            continue
-                        await process_response(response)
+                            await process_response(response)
+                        except Exception as e:
+                            print(e)
+                            _running = False
         
                 async def process_response(response):
                     if "ProcessImage" in response:
@@ -138,8 +139,6 @@ while True:
                     await websocket.send(to_signalr_message(send_fen_message))
         
                 await handshake()
-        
-                _running = True
         
                 listen_task = asyncio.create_task(listen())
         
