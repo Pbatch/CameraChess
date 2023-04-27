@@ -5,17 +5,23 @@ import shutil
 from imagesize import imagesize
 from tqdm import tqdm
 
-from camera_chess.constants import CLASSES
+from camera_chess.constants import CLASSES, DATA_DIR, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR
 from glob import glob
+
+from camera_chess.utils import clear_dir
 
 
 def main():
-    dataset_name = 'roboflow_4'
-    for image_path in tqdm(glob(f'data/{dataset_name}/images/*.jpg')):
+    dataset_id = 7
+    image_paths = sorted(glob(os.path.join(DATA_DIR, 'roboflow', str(dataset_id), 'images', '*.jpg')))
+    clear_dir(STUDIO_IMAGE_DIR)
+    clear_dir(STUDIO_LABEL_DIR)
+
+    for image_path in tqdm(image_paths):
         yolo_path = image_path.replace('images', 'yolov5').replace('.jpg', '.txt')
 
         basename = os.path.basename(image_path)
-        new_image_path = os.path.join('label_studio', 'files', 'images', basename)
+        new_image_path = os.path.join(STUDIO_IMAGE_DIR, basename)
         shutil.copyfile(image_path, new_image_path)
 
         d = {'data': {'img': f'/data/local-files/?d=images/{basename}'},
@@ -42,7 +48,7 @@ def main():
                 label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [class_]}
                 d['annotations'][0]['result'].append(label)
 
-        with open(os.path.join('label_studio', 'files', 'yolo', basename.replace('.jpg', '.json')), 'w') as f:
+        with open(os.path.join(STUDIO_LABEL_DIR, basename.replace('.jpg', '.json')), 'w') as f:
             json.dump(d, f, indent=4)
 
 

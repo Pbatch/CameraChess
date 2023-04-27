@@ -1,3 +1,4 @@
+import onnx
 import torch
 import torch.nn.functional as F
 import torchvision
@@ -108,19 +109,23 @@ def load_model(model_path):
     return wrapped_model
 
 
-def export(model, save_path):
+def export(model, save_path, dynamic=True, opset_version=16):
     image = torch.randint(0, 256, (1, 400, 500, 3), dtype=torch.uint8)
-    dynamic = {'image': {0: 'batch', 1: 'height', 2: 'width'},
-               'output0': {0: 'batch', 1: 'anchors'}}
+    if dynamic:
+        dynamic_axes = {'image': {0: 'batch', 1: 'height', 2: 'width'},
+                        'output0': {0: 'batch', 1: 'anchors'}}
+    else:
+        dynamic_axes = None
+
     torch.onnx.export(model=model.cpu(),
                       args=image.cpu(),
                       f=save_path,
                       verbose=False,
-                      opset_version=16,
+                      opset_version=opset_version,
                       do_constant_folding=True,
                       input_names=['image'],
                       output_names=['output0'],
-                      dynamic_axes=dynamic)
+                      dynamic_axes=dynamic_axes)
 
 
 def main():

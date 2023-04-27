@@ -118,7 +118,7 @@ while True:
                         print(state.last_move)
         
                     image = visualizer.add_bboxes_from_tracks(image, tracks, keypoints)
-                    image = visualizer.add_board(image, state)
+                    # image = visualizer.add_board(image, state)
         
                     output = {'image': image_to_bytes(image),
                               'state': obj_to_bytes(state),

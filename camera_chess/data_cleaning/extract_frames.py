@@ -17,7 +17,7 @@ def main():
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    dataset = 'peter/keres_szabo'
+    dataset = 'youtube/retired_lawyer'
     overwrite = True
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=4)

@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import LICHESS_TOKEN_PETER, LICHESS_TOKEN_CONOR
+from camera_chess.constants import LICHESS_TOKEN_PETER, LICHESS_TOKEN_CONOR, LICHESS_TOKEN_1
 from camera_chess.detector import Detector
 from camera_chess.lichess_game import LichessGame
 from camera_chess.state import State
@@ -15,7 +15,7 @@ from camera_chess.webcam import Webcam
 
 
 def main():
-    keypoints = np.array([[468, 144], [615, 441], [25, 395], [174, 133]], dtype=np.float32)
+    keypoints = np.array([[0, 386], [133, 64], [450, 98], [623, 399]], dtype=np.float32)
     webcam = Webcam(keypoints, camera_id=1)
 
     visualizer = Visualizer()
@@ -29,7 +29,7 @@ def main():
                       track_low_thresh=0.1)
     state = State()
     games = []
-    tokens = [LICHESS_TOKEN_PETER, LICHESS_TOKEN_CONOR]
+    tokens = [LICHESS_TOKEN_PETER, LICHESS_TOKEN_1]
     for token in tokens:
         game = LichessGame(token)
         game.daemon = True

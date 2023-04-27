@@ -13,15 +13,16 @@ from camera_chess.constants import CLASSES, DATA_DIR, YOLO_DIR
 from camera_chess.utils import clear_dir
 
 
-def main(image_size, train_fraction, max_split_size):
-    for split in ['train', 'val']:
+def main(image_size, train_fraction):
+    for split in ['train', 'val', 'synthetic']:
         for i in ['images', 'labels']:
             clear_dir(os.path.join(YOLO_DIR, split, i))
 
     youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
                         'shimanov_vidit', 'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
-                        'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan', 'hans_rinat']
-    roboflow_datasets = ['1', '2', '3', '4', '5']
+                        'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan', 'hans_rinat',
+                        'retired_lawyer']
+    roboflow_datasets = ['1', '2', '3', '4', '5', '6', '7']
     peter_datasets = ['smothered_mate', 'scholars_mate', 'kasparov_immortal',
                       'peter_emma', 'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
                       'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',
@@ -34,10 +35,9 @@ def main(image_size, train_fraction, max_split_size):
     datasets.extend([os.path.join('youtube', s) for s in youtube_datasets])
     datasets.extend([os.path.join('roboflow', s) for s in roboflow_datasets])
     datasets.extend([os.path.join('single_piece', s) for s in single_piece_datasets])
+    synthetic_datasets = [os.path.join('roboflow', '7'), 'chesscog']
     for dataset in datasets:
         label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
-        if len(label_paths) > max_split_size:
-            label_paths = random.sample(label_paths, max_split_size)
         for label_path in tqdm(label_paths, desc=dataset):
             with open(label_path, 'r') as f:
                 label = json.load(f)
@@ -79,7 +79,12 @@ def main(image_size, train_fraction, max_split_size):
             crop_width, crop_height = image.width, image.height
             image = ImageOps.contain(image, (image_size, image_size))
 
-            split = "train" if np.random.random() < train_fraction else "val"
+            if dataset in synthetic_datasets:
+                split = "synthetic"
+            elif np.random.random() < train_fraction:
+                split = "train"
+            else:
+                split = "val"
             id_ = f'{dataset.replace(os.path.sep, "_")}_{os.path.splitext(os.path.basename(image_path))[0]}'
             new_image_path = os.path.join(YOLO_DIR, split, 'images', f'{id_}.jpg')
             image.save(new_image_path)
@@ -103,6 +108,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--image_size', type=int, default=480)
     parser.add_argument('-f', '--train_fraction', type=float, default=0.9)
-    parser.add_argument('-m', '--max_split_size', type=int, default=2000)
     args = parser.parse_args()
-    main(args.image_size, args.train_fraction, args.max_split_size)
+    main(args.image_size, args.train_fraction)

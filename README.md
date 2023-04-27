@@ -2,8 +2,9 @@
 
 ## TODO
 
-* Fix AWS stuff (swap tracker to Scipy version)
-* Try some more TFLite stuff
+* Setup tracker on AWS lambda
+* Look at results of synthetic/non-synthetic training
+* Create proper train/val split (no leakage)
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

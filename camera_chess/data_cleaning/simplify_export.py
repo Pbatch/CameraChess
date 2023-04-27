@@ -9,8 +9,8 @@ from camera_chess.visualizer import Visualizer
 
 
 def main():
-    export_id = 'project-1-at-2023-03-31-17-17-ddc97973'
-    dataset = 'single_piece/black-bishop'
+    export_id = 'project-1-at-2023-04-14-15-04-5564142b'
+    dataset = 'roboflow/7'
     verbose = False
     visualizer = Visualizer()
     with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:

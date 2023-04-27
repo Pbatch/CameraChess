@@ -45,7 +45,7 @@ def callback(infer_request, info):
 
 
 def main():
-    dataset = 'youtube/carlsen_abdu'
+    dataset = 'peter/kasparov_immortal'
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=4)
     video.save_start_image()
@@ -54,9 +54,9 @@ def main():
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,
                       keypoints=video.new_keypoints,
-                      new_track_thresh=0.3,
-                      track_high_thresh=0.3,
-                      track_low_thresh=0.1)
+                      new_track_thresh=0.6,
+                      track_high_thresh=0.6,
+                      track_low_thresh=0.3)
     visualizer = Visualizer()
     state = State(video_config.fen)
     clear_dir('debug')
