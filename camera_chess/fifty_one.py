@@ -10,7 +10,7 @@ from camera_chess.constants import DATA_DIR
 def load_label_studio():
     samples = []
     keypoint_order = ['h1', 'a1', 'a8', 'h8']
-    for dataset in ['roboflow/6']:
+    for dataset in ['roboflow/9']:
         for image_path in glob(os.path.join(DATA_DIR, dataset, 'images', '*')):
             sample = fo.Sample(filepath=image_path)
 
@@ -50,8 +50,8 @@ def load_yolo():
 
 
 def main():
-    dataset = load_yolo().shuffle()
-    # dataset = load_label_studio()
+    # dataset = load_yolo().shuffle()
+    dataset = load_label_studio().shuffle()
     session = fo.launch_app(dataset)
     session.wait()
 

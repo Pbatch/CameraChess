@@ -2,9 +2,9 @@
 
 ## TODO
 
-* Setup tracker on AWS lambda
-* Look at results of synthetic/non-synthetic training
 * Create proper train/val split (no leakage)
+* Pad images properly in make_yolo_data
+* Remove CV2 dependency for warping in tracker, then add back "square code" to AWS lambda
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

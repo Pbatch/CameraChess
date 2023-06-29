@@ -1,4 +1,3 @@
-import onnx
 import torch
 import torch.nn.functional as F
 import torchvision
@@ -7,6 +6,9 @@ from ultralytics.nn.modules import Detect, C2f
 
 
 class WrappedModel(nn.Module):
+    max_wh = 7680
+    max_classes = 12
+
     def __init__(self, model, image_size=480, fill_colour=114, conf_thres=0.1, iou_thres=0.4):
         super().__init__()
         self.model = model
@@ -65,19 +67,20 @@ class WrappedModel(nn.Module):
         return y
 
     def _nms(self, y):
-        y = y.transpose(1, 0)
+        y = y.transpose(2, 1)
 
         # Multi-label
-        box_idx, class_idx = (y[:, 4:] > self.conf_thres).nonzero(as_tuple=False).T
-        boxes = y[box_idx, :4]
-        scores = y[box_idx, 4 + class_idx]
+        batch_idx, box_idx, class_idx = (y[..., 4:] > self.conf_thres).nonzero(as_tuple=False).T
+        boxes = y[batch_idx, box_idx, :4]
+        scores = y[batch_idx, box_idx, 4 + class_idx]
 
-        shifted_boxes = boxes + class_idx[:, None] * 10000
+        shifted_boxes = boxes + class_idx[:, None] * self.max_wh + batch_idx[:, None] * self.max_wh * self.max_classes
         keep = torchvision.ops.nms(shifted_boxes, scores, self.iou_thres)
 
         scores = torch.unsqueeze(scores, dim=1)
         class_idx = torch.unsqueeze(class_idx, dim=1)
-        result = torch.concatenate([boxes[keep], scores[keep], class_idx[keep]], dim=1)
+        batch_idx = torch.unsqueeze(batch_idx, dim=1)
+        result = torch.concatenate([batch_idx[keep], boxes[keep], scores[keep], class_idx[keep]], dim=1)
 
         return result
 
@@ -86,8 +89,7 @@ class WrappedModel(nn.Module):
         x, padding = self._preprocess(x)
         y = self.model(x)
         y = self._fix_bboxes(y, padding, width, height)
-        # For now only support a batch_size of 1
-        y = self._nms(y[0])
+        y = self._nms(y)
         return y
 
 
@@ -110,10 +112,10 @@ def load_model(model_path):
 
 
 def export(model, save_path, dynamic=True, opset_version=16):
-    image = torch.randint(0, 256, (1, 400, 500, 3), dtype=torch.uint8)
+    image = torch.randint(0, 256, (8, 400, 500, 3), dtype=torch.uint8)
     if dynamic:
-        dynamic_axes = {'image': {0: 'batch', 1: 'height', 2: 'width'},
-                        'output0': {0: 'batch', 1: 'anchors'}}
+        dynamic_axes = {'images': {0: 'batch', 1: 'height', 2: 'width'},
+                        'detections': {0: 'n_dets', 1: 'batch_bbox_conf_cls'}}
     else:
         dynamic_axes = None
 
@@ -123,8 +125,8 @@ def export(model, save_path, dynamic=True, opset_version=16):
                       verbose=False,
                       opset_version=opset_version,
                       do_constant_folding=True,
-                      input_names=['image'],
-                      output_names=['output0'],
+                      input_names=['images'],
+                      output_names=['detections'],
                       dynamic_axes=dynamic_axes)
 
 

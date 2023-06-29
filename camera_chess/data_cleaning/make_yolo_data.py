@@ -21,8 +21,8 @@ def main(image_size, train_fraction):
     youtube_datasets = ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'carlsen_vidit', 'carlsen_abdu',
                         'shimanov_vidit', 'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
                         'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan', 'hans_rinat',
-                        'retired_lawyer']
-    roboflow_datasets = ['1', '2', '3', '4', '5', '6', '7']
+                        'retired_lawyer', 'ramirez_yoo']
+    roboflow_datasets = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
     peter_datasets = ['smothered_mate', 'scholars_mate', 'kasparov_immortal',
                       'peter_emma', 'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
                       'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',

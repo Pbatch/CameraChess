@@ -1,3 +1,4 @@
+backup
 data
 label_studio
 sparseml
@@ -5,7 +6,7 @@ debug
 blender
 models
 .idea/
-camera_chess/aws
+segmentation
 
 *.tar.gz
 *.jpg

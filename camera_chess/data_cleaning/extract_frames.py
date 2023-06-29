@@ -17,10 +17,10 @@ def main():
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    dataset = 'youtube/retired_lawyer'
+    dataset = 'youtube/ramirez_yoo'
     overwrite = True
     video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=4)
+    video = Video(video_config, target_fps=8)
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
                           'from_name': 'kp-1',
@@ -40,9 +40,9 @@ def main():
                         keypoints=video.new_keypoints)
     tracker = Tracker(fps=video.target_fps,
                       keypoints=video.new_keypoints,
-                      track_high_thresh=0.6,
-                      new_track_thresh=0.3,
-                      track_low_thresh=0.3)
+                      track_high_thresh=0.3,
+                      new_track_thresh=0.1,
+                      track_low_thresh=0.1)
     board = chess.Board(fen=video_config.fen)
 
     move_idx = 0

@@ -19,13 +19,9 @@ class Detector:
         self.input_layer_ir = self.model.input(0)
         self.infer_request = self.model.create_infer_request()
 
-    @staticmethod
-    def callback(infer_request):
-        return infer_request.get_output_tensor(0).data
-
     def filter_by_roi(self, pred):
-        piece_centers = np.vstack([(pred[:, 0] + pred[:, 2]) / 2,
-                                   pred[:, 3] - ((pred[:, 2] - pred[:, 0]) / 4)]).T
+        piece_centers = np.vstack([(pred[:, 1] + pred[:, 3]) / 2,
+                                   pred[:, 4] - ((pred[:, 3] - pred[:, 1]) / 4)]).T
         mask = np.ones(len(piece_centers), dtype=bool)
         for i in range(4):
             v1 = self.keypoints[i-1] - self.keypoints[i]
@@ -35,11 +31,11 @@ class Detector:
         pred = pred[mask]
         return pred
 
-    def run(self, image: np.ndarray):
-        self.infer_request.set_tensor(self.input_layer_ir, Tensor(np.expand_dims(image, axis=0)))
+    def run(self, images):
+        self.infer_request.set_tensor(self.input_layer_ir, Tensor(images))
         self.infer_request.infer()
         pred = self.infer_request.get_output_tensor(0).data
         pred = self.filter_by_roi(pred)
+        pred = [pred[pred[:, 0] == i, 1:].tolist() for i in range(len(images))]
 
-        detections = Detections(pred[:, :4], pred[:, 4], pred[:, 5].astype(int))
-        return detections
+        return pred

@@ -12,7 +12,7 @@ from camera_chess.utils import clear_dir
 
 
 def main():
-    dataset_id = 7
+    dataset_id = 9
     image_paths = sorted(glob(os.path.join(DATA_DIR, 'roboflow', str(dataset_id), 'images', '*.jpg')))
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
@@ -37,6 +37,8 @@ def main():
                   'type': 'rectanglelabels'}
         with open(yolo_path, 'r') as f:
             lines = [line.strip().split() for line in f.readlines()]
+
+        try:
             for class_id, xc, yc, w, h in lines:
                 class_ = CLASSES[int(class_id)]
                 xc, yc, w, h = [float(i) for i in [xc, yc, w, h]]
@@ -47,6 +49,8 @@ def main():
                 label = result.copy()
                 label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [class_]}
                 d['annotations'][0]['result'].append(label)
+        except ValueError:
+            print(f'Bad path: {yolo_path}')
 
         with open(os.path.join(STUDIO_LABEL_DIR, basename.replace('.jpg', '.json')), 'w') as f:
             json.dump(d, f, indent=4)
