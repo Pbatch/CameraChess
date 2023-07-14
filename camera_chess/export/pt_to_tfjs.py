@@ -2,7 +2,7 @@ from ultralytics import YOLO
 
 
 def main():
-    model = YOLO('models/480S.pt')
+    model = YOLO('models/480S_pruned.pt')
     model.export(format='tfjs')
 
 

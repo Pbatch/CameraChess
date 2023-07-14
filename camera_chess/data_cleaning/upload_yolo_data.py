@@ -12,7 +12,7 @@ from camera_chess.utils import clear_dir
 
 
 def main():
-    dataset_id = 9
+    dataset_id = 11
     image_paths = sorted(glob(os.path.join(DATA_DIR, 'roboflow', str(dataset_id), 'images', '*.jpg')))
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
