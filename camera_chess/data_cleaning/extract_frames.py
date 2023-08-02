@@ -1,23 +1,27 @@
+import argparse
 import json
 import os
+import sys
 
 import chess
 import chess.pgn
+import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
 from camera_chess.constants import CORNERS, PIECE_TO_CLASS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR
 from camera_chess.detector import Detector
-from camera_chess.tracker.tracker import Tracker
 from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.video import Video
 
+sys.path.insert(0, '../CameraChessWeb/aws/tracker')
+from tracker import Tracker
 
-def main():
+
+def main(dataset):
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    dataset = 'youtube/ramirez_yoo'
     overwrite = True
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
@@ -47,10 +51,10 @@ def main():
 
     move_idx = 0
     for image, frame in tqdm(video):
-        detections = detector.run(image)
-        tracks = tracker.update(detections)
+        pred = np.array(detector.run(np.expand_dims(image, axis=0))[0])
+        tracker.update(pred)
 
-        pred_occupied = {track.square for track in tracks}
+        pred_occupied = {track.square for track in tracker.tracks}
         move = video_config.moves[move_idx]
         from_square = move[:2]
         to_square = move[2:]
@@ -74,7 +78,7 @@ def main():
                            'type': 'rectanglelabels'}
 
         used = set()
-        for track in tracks:
+        for track in tracker.tracks:
             if track.square in used:
                 continue
             x = 100 * track.bbox[0] / video.width
@@ -106,4 +110,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', '-d', type=str, required=True)
+    args = parser.parse_args()
+    main(args.dataset)

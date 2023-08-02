@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import time
@@ -8,9 +9,7 @@ from camera_chess.constants import DATA_DIR
 from camera_chess.visualizer import Visualizer
 
 
-def main():
-    export_id = 'project-1-at-2023-06-29-22-50-b6eb6a41'
-    dataset = 'roboflow/11'
+def main(dataset, export_id):
     verbose = False
     visualizer = Visualizer()
     with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:
@@ -54,4 +53,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', '-d', type=str, required=True)
+    parser.add_argument('--export_id', '-e', type=str, required=True)
+    args = parser.parse_args()
+    main(args.dataset, args.export_id)

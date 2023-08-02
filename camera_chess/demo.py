@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 
@@ -52,8 +53,7 @@ def local(preds, tracker, state, tracker_kwargs, state_kwargs):
     return tracker, state
 
 
-def main():
-    dataset = 'youtube/carlsen_vidit'
+def main(dataset):
     batch_size = 8
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
@@ -85,9 +85,11 @@ def main():
         i = 0
 
     print(state.game)
-    print(state.moves)
-    print(state.lichess_string)
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', '-d', type=str, required=True)
+    args = parser.parse_args()
+    main(args.dataset)
+

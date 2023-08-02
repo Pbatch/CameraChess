@@ -18,7 +18,8 @@ DATASETS = {
     'val': ['google',
             os.path.join('peter', 'scholars_mate'),
             os.path.join('youtube', 'carlsen_vidit')],
-    'train': [*[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
+    'train': ['google_empty',
+              *[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
                                                      'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
                                                      'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',
                                                      'hans_rinat', 'retired_lawyer', 'ramirez_yoo']],
@@ -28,7 +29,9 @@ DATASETS = {
                                                    'tal_sviridov', 'larsen_spassky', 'furman_spassky',
                                                    'wells_speelman']],
               *[os.path.join('single_piece', s) for s in CLASSES],
-              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11']]
+              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11']],
+              *[os.path.join('peter_wooden', s) for s in ['scholars_mate', 'smothered_mate', 'gerasimov_smyslov',
+                                                          'wells_shirov']]
               ]
 }
 
