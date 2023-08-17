@@ -1,11 +1,5 @@
 # Camera Chess
 
-## TODO
-
-* Create proper train/val split (no leakage)
-* Pad images properly in make_yolo_data
-* Remove CV2 dependency for warping in tracker, then add back "square code" to AWS lambda
-
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog
 * Play online - https://github.com/karayaman/Play-online-chess-with-real-chess-board

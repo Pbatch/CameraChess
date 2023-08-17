@@ -131,9 +131,9 @@ def export(model, save_path, dynamic=True, opset_version=16):
 
 
 def main():
-    model_path = 'models/480S.pt'
+    model_path = 'models/480N.pt'
     model = load_model(model_path)
-    export(model, 'models/480S.onnx')
+    export(model, 'models/480N.onnx')
 
 
 if __name__ == '__main__':

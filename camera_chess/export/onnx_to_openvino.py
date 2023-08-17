@@ -9,7 +9,7 @@ def onnx_to_openvino(onnx_path):
 
 
 def main():
-    onnx_path = 'models/480S.onnx'
+    onnx_path = 'models/480N.onnx'
     onnx_to_openvino(onnx_path)
 
 

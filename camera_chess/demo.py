@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 
 import numpy as np
@@ -10,6 +11,8 @@ from camera_chess.detector import Detector
 from camera_chess.utils import load_video_config, clear_dir
 from camera_chess.utils import serialize, deserialize
 from camera_chess.video import Video
+from PIL import Image
+from camera_chess.visualizer import Visualizer
 
 # Need for deserialization
 sys.path.insert(0, '../CameraChessWeb/aws/tracker')
@@ -58,15 +61,16 @@ def main(dataset):
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
-    detector = Detector(model_path='models/480S-quant.xml',
-                        weights_path='models/480S-quant.bin',
+    detector = Detector(model_path='models/480N.xml',
+                        weights_path='models/480N.bin',
                         keypoints=video.new_keypoints)
+    visualizer = Visualizer()
     tracker_kwargs = {'fps': video.target_fps,
                       'keypoints': video.new_keypoints.tolist(),
                       'new_track_thresh': 0.3,
                       'track_high_thresh': 0.3,
                       'track_low_thresh': 0.1}
-    state_kwargs = {'fen': video_config.fen}
+    state_kwargs = {'starting_fen': video_config.fen}
     clear_dir('debug')
 
     tracker = None
@@ -84,7 +88,13 @@ def main(dataset):
         tracker, state = local(preds, tracker, state, tracker_kwargs, state_kwargs)
         i = 0
 
-    print(state.game)
+        if state.change:
+            image = Image.fromarray(image)
+            image = visualizer.add_bboxes_from_tracks(image, tracker.tracks)
+            image.save(os.path.join('debug', f'{frame}.jpg'))
+
+        pgn = state.write_pgn()
+        print(pgn)
 
 
 if __name__ == '__main__':

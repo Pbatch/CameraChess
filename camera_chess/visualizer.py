@@ -61,31 +61,6 @@ class Visualizer:
 
         return image
 
-    @staticmethod
-    def add_bboxes(image, bboxes):
-        image = image.copy()
-        width, height = image.width, image.height
-
-        d = ImageDraw.Draw(image)
-        for piece, x, y, w, h in bboxes:
-            ltrb = [x * width,
-                    y * height,
-                    (x + w) * width,
-                    (y + h) * height]
-            d.rectangle(tuple(ltrb), width=5, outline=COLOUR_MAP[piece])
-
-        return image
-
-    def add_board(self, image, state):
-        board_image = state.get_image()
-        board_image = board_image.resize((image.height, image.height))
-
-        new_image = Image.new('RGB', (image.width + image.height, image.height))
-        new_image.paste(image, (0, 0))
-        new_image.paste(board_image, (image.width, 0))
-
-        return new_image
-
     def create_gif(self, image_dir, save_path):
         image_paths = sorted(glob(os.path.join(image_dir, '*.jpg')),
                              key=lambda x: int(os.path.basename(x).replace('.jpg', '')))
