@@ -20,7 +20,7 @@ DATASETS = {
             os.path.join('youtube', 'carlsen_vidit')],
     'train': ['google_empty',
               *[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
-                                                     'harika_nana', 'harika_mariam', 'anand_carlsen', 'gukesh_shakh',
+                                                     'harika_nana', 'anand_carlsen', 'gukesh_shakh',
                                                      'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',
                                                      'hans_rinat', 'retired_lawyer', 'ramirez_yoo']],
               *[os.path.join('peter', s) for s in ['smothered_mate', 'kasparov_immortal', 'peter_emma',

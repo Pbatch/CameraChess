@@ -4,7 +4,7 @@ from glob import glob
 
 import fiftyone as fo
 
-from camera_chess.constants import DATA_DIR
+from camera_chess.constants import DATA_DIR, CLASSES
 
 
 def load_label_studio():
@@ -37,21 +37,39 @@ def load_label_studio():
 
 
 def load_yolo():
-    dataset = fo.Dataset()
+    samples = []
     for split in ['train', 'val']:
-        dataset.add_dir(
-            dataset_dir=os.path.join(DATA_DIR, 'yolo'),
-            yaml_path=os.path.join(DATA_DIR, 'yolo/data.yaml'),
-            dataset_type=fo.types.YOLOv5Dataset,
-            split=split,
-            tags=split,
-        )
+        for label_path in glob(os.path.join(DATA_DIR, 'yolo', split, 'labels', '*.txt')):
+            image_path = label_path.replace('labels', 'images', 1).replace('.txt', '.jpg')
+            source_dataset = '_'.join(os.path.basename(label_path).split('_')[:-1])
+            sample = fo.Sample(filepath=image_path,
+                               tags=[split, source_dataset],
+                               basename=os.path.basename(label_path))
+            with open(label_path) as f:
+                lines = [line.strip() for line in f.readlines()]
+
+            detections = []
+            for line in lines:
+                cls_idx, xc, yc, w, h = [float(i) for i in line.split()]
+                label = CLASSES[int(cls_idx)]
+                bounding_box = [xc - w/2, yc - h/2, w, h]
+                detection = fo.Detection(label=label,
+                                         bounding_box=bounding_box,
+                                         tags=[label])
+                detections.append(detection)
+            sample['groundtruth'] = fo.Detections(detections=detections)
+            samples.append(sample)
+
+    dataset = fo.Dataset()
+    dataset.add_samples(samples)
+    dataset.save()
+
     return dataset
 
 
 def main():
-    # dataset = load_yolo().shuffle()
-    dataset = load_label_studio().shuffle()
+    dataset = load_yolo().shuffle()
+    # dataset = load_label_studio().shuffle()
     session = fo.launch_app(dataset)
     session.wait()
 
