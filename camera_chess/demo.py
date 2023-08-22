@@ -39,7 +39,7 @@ def aws(preds, tracker, state, tracker_kwargs, state_kwargs):
     tracker = deserialize(content['tracker'])
     state = deserialize(content['state'])
 
-    return tracker, state
+    return tracker, state, state.change
 
 
 def local(preds, tracker, state, tracker_kwargs, state_kwargs):
@@ -49,11 +49,15 @@ def local(preds, tracker, state, tracker_kwargs, state_kwargs):
     if state is None:
         state = State(**state_kwargs)
 
+    change = False
     for pred in preds:
         pred = np.array(pred) if len(pred) else np.empty(shape=(0, 6))
         tracker.update(pred)
         state.update(tracker.tracks)
-    return tracker, state
+        if state.change:
+            change = True
+
+    return tracker, state, change
 
 
 def main(dataset):
@@ -61,9 +65,9 @@ def main(dataset):
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     video.save_start_image()
-    detector = Detector(model_path='models/480N.xml',
-                        weights_path='models/480N.bin',
-                        keypoints=video.new_keypoints)
+    detector = Detector(model_path='models/480L.pt',
+                        keypoints=video.new_keypoints,
+                        device='cuda')
     visualizer = Visualizer()
     tracker_kwargs = {'fps': video.target_fps,
                       'keypoints': video.new_keypoints.tolist(),
@@ -85,16 +89,18 @@ def main(dataset):
             continue
 
         preds = detector.run(images[:i])
-        tracker, state = local(preds, tracker, state, tracker_kwargs, state_kwargs)
+        tracker, state, change = local(preds, tracker, state, tracker_kwargs, state_kwargs)
         i = 0
 
-        if state.change:
+        if change:
             image = Image.fromarray(image)
             image = visualizer.add_bboxes_from_tracks(image, tracker.tracks)
             image.save(os.path.join('debug', f'{frame}.jpg'))
+            pgn = state.write_pgn()
+            print(pgn)
 
-        pgn = state.write_pgn()
-        print(pgn)
+    pgn = state.write_pgn()
+    print(pgn)
 
 
 if __name__ == '__main__':

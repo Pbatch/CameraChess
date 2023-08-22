@@ -1,18 +1,19 @@
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 from glob import glob
 
 import numpy as np
 import torch
 import torchvision
+from icecream import ic
 from tqdm import tqdm
 
 from camera_chess.constants import YOLO_DIR, CLASSES
 
 
 def main():
-    bad_labels = []
-    exempt_datasets = ['roboflow_9']
+    bad_labels = defaultdict(lambda: defaultdict(list))
+    exempt_datasets = ['roboflow_9', 'roboflow_public', 'roboflow_ppp']
     piece_to_max_count = {'black-king': 1,
                           'white-king': 1,
                           'black-queen': 2,
@@ -32,6 +33,11 @@ def main():
         if not len(lines):
             continue
 
+        basename = os.path.basename(label_path)
+        *root_dataset, id_ = basename.split('_')
+        root_dataset = '_'.join(root_dataset)
+        id_ = id_.replace('.txt', '')
+
         classes = []
         bboxes = []
         for line in lines:
@@ -48,26 +54,25 @@ def main():
         bboxes = torch.Tensor(bboxes)
         iou = torchvision.ops.box_iou(bboxes, bboxes)
         high_iou = torch.nonzero(torch.triu(iou, diagonal=1) > 0.9)
-
-        basename = os.path.basename(label_path)
         for i, j in high_iou:
-            bad_labels.append([basename, classes[i], classes[j], 'overlapping bboxes'])
-
-        root_dataset = '_'.join(basename.split('_')[:-1])
-        if root_dataset in exempt_datasets:
-            continue
+            bad_labels[root_dataset][id_].append(['overlapping_bboxes', classes[i], classes[j]])
 
         bad_pieces = False
         bad_count = {}
         for piece in CLASSES:
-            if class_counts.get(piece, 0) > piece_to_max_count[piece]:
+            if class_counts.get(piece, 0) > piece_to_max_count[piece] and root_dataset not in exempt_datasets:
                 bad_count[piece] = class_counts[piece]
                 bad_pieces = True
         if bad_pieces:
-            bad_labels.append([basename, bad_count, 'bad pieces'])
+            bad_labels[root_dataset][id_].append(['bad_pieces', bad_count])
 
-    for label in bad_labels:
-        print(label)
+        for bbox in bboxes.numpy():
+            if bbox[2] < 0.05 or bbox[3] < 0.05:
+                bad_labels[root_dataset][id_].append(['small_bbox', bbox.tolist()])
+
+    for root_dataset, d in bad_labels.items():
+        ic(root_dataset)
+        ic(dict(d))
 
 
 if __name__ == '__main__':

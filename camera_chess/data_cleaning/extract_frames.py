@@ -22,7 +22,6 @@ def main(dataset):
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    overwrite = True
     video_config = load_video_config(dataset)
     video = Video(video_config, target_fps=8)
     keypoints_template = {'original_width': video.width,
@@ -39,9 +38,9 @@ def main(dataset):
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    detector = Detector(model_path='models/480S-quant.xml',
-                        weights_path='models/480S-quant.bin',
-                        keypoints=video.new_keypoints)
+    detector = Detector(model_path="models/480L.pt",
+                        keypoints=video.new_keypoints,
+                        device='cuda')
     tracker = Tracker(fps=video.target_fps,
                       keypoints=video.new_keypoints,
                       track_high_thresh=0.3,
@@ -88,14 +87,11 @@ def main(dataset):
             label = labels_template.copy()
 
             # Use the board to overwrite the piece classification
-            if overwrite:
-                square = chess.parse_square(track.square)
-                piece = board.piece_at(square)
-                if piece is None:
-                    continue
-                piece = PIECE_TO_CLASS[piece]
-            else:
-                piece = track.piece
+            square = chess.parse_square(track.square)
+            piece = board.piece_at(square)
+            if piece is None:
+                continue
+            piece = PIECE_TO_CLASS[piece]
             used.add(track.square)
 
             label['value'] = {'x': x, 'y': y, 'width': w, 'height': h, 'rectanglelabels': [piece]}
