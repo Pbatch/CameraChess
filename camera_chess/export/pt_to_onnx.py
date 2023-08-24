@@ -24,7 +24,7 @@ def export(model, save_path, dynamic=True, opset_version=16):
 
 def main():
     model_path = 'models/480L.pt'
-    model = load_model(model_path)
+    model = load_model(model_path, 'cpu')
     export(model, 'models/480L.onnx')
 
 

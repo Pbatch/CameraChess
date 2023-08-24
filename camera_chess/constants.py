@@ -7,6 +7,7 @@ STUDIO_IMAGE_DIR = os.path.join(STUDIO_DIR, 'files', 'images')
 STUDIO_LABEL_DIR = os.path.join(STUDIO_DIR, 'files', 'labels')
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 YOLO_DIR = os.path.join(DATA_DIR, 'yolo')
+KEYPOINTS_DIR = os.path.join(DATA_DIR, 'keypoints')
 
 CLASS_TO_PIECE = {'black-bishop': chess.Piece(chess.BISHOP, chess.BLACK),
                   'black-king': chess.Piece(chess.KING, chess.BLACK),

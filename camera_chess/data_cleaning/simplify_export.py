@@ -7,6 +7,7 @@ from PIL import Image
 
 from camera_chess.constants import DATA_DIR
 from camera_chess.visualizer import Visualizer
+from tqdm import tqdm
 
 
 def main(dataset, export_id):
@@ -17,7 +18,7 @@ def main(dataset, export_id):
 
     os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'))
     os.makedirs(os.path.join(DATA_DIR, dataset, 'images'))
-    for i, label in enumerate(labels):
+    for i, label in enumerate(tqdm(labels)):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
         for annotation in label['annotations'][0]['result']:

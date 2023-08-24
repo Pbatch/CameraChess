@@ -7,7 +7,7 @@ import fiftyone as fo
 from tqdm import tqdm
 import numpy as np
 
-from camera_chess.constants import DATA_DIR, CLASSES
+from camera_chess.constants import DATA_DIR, CLASSES, CORNERS
 from camera_chess.export.wrapped_model import load_model
 from torchmetrics.detection import MeanAveragePrecision
 from torchvision.transforms import Compose, PILToTensor
@@ -96,7 +96,7 @@ def load_yolo(pred_dir):
                     cls_idx = int(cls_idx)
                     label = CLASSES[cls_idx]
 
-                    bounding_box = [x - w/2, y - h/2, w, h]
+                    bounding_box = [x - w / 2, y - h / 2, w, h]
 
                     boxes.append(bounding_box)
                     labels.append(cls_idx)
@@ -132,9 +132,50 @@ def load_yolo(pred_dir):
     return dataset
 
 
+def load_corners():
+    samples = []
+    for split in ['train', 'val']:
+        paths = glob(os.path.join(DATA_DIR, 'corners', split, 'labels', '*.txt'))
+        for label_path in tqdm(sorted(paths)):
+            image_path = label_path.replace('labels', 'images', 1).replace('.txt', '.jpg')
+            source_dataset = '_'.join(os.path.basename(label_path).split('_')[:-1])
+            sample = fo.Sample(filepath=image_path,
+                               tags=[split, source_dataset],
+                               basename=os.path.basename(label_path))
+            with open(label_path) as f:
+                lines = [line.strip() for line in f.readlines()]
+
+            detections = []
+            gt_boxes = []
+            gt_labels = []
+            for line in lines:
+                cls_idx, xc, yc, w, h = [float(i) for i in line.split()]
+                cls_idx = int(cls_idx)
+
+                label = CORNERS[cls_idx]
+                bounding_box = [xc - w / 2, yc - h / 2, w, h]
+                detection = fo.Detection(label=label,
+                                         bounding_box=bounding_box,
+                                         tags=[label])
+                detections.append(detection)
+
+                gt_boxes.append(bounding_box)
+                gt_labels.append(cls_idx)
+            sample['groundtruth'] = fo.Detections(detections=detections)
+            samples.append(sample)
+
+    dataset = fo.Dataset()
+    dataset.add_samples(samples)
+    dataset.save()
+
+    return dataset
+
+
 def main(mode, detections):
     if mode == 'yolo':
         dataset = load_yolo(detections)
+    elif mode == 'corners':
+        dataset = load_corners()
     else:
         # mode = 'studio'
         dataset = load_label_studio()
@@ -144,7 +185,7 @@ def main(mode, detections):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', '-m', type=str, required=True, choices=['yolo', 'studio'])
+    parser.add_argument('--mode', '-m', type=str, required=True, choices=['yolo', 'studio', 'corners'])
     parser.add_argument('--pred_dir', '-p', type=str, default=None)
     args = parser.parse_args()
     main(args.mode, args.pred_dir)

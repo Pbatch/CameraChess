@@ -53,7 +53,7 @@ def main():
         bboxes[:, 3] += bboxes[:, 1]
         bboxes = torch.Tensor(bboxes)
         iou = torchvision.ops.box_iou(bboxes, bboxes)
-        high_iou = torch.nonzero(torch.triu(iou, diagonal=1) > 0.9)
+        high_iou = torch.nonzero(torch.triu(iou, diagonal=1) > 0.85)
         for i, j in high_iou:
             bad_labels[root_dataset][id_].append(['overlapping_bboxes', classes[i], classes[j]])
 
