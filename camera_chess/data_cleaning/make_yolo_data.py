@@ -27,7 +27,7 @@ DATASETS = {
                                                    'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
                                                    'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',
                                                    'tal_sviridov', 'larsen_spassky', 'furman_spassky',
-                                                   'wells_speelman', 'random', 'pub']],
+                                                   'wells_speelman', 'glass_1', 'glass_2', 'glass_3', 'pub']],
               *[os.path.join('single_piece', s) for s in CLASSES],
               *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11',
                                                       'public', 'ppp']],

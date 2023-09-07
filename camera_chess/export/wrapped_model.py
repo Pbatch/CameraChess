@@ -27,11 +27,12 @@ class WrappedModel(nn.Module):
         height, width = x.shape[2:]
         ratio = height / width
         if ratio > 1:
-            height = self.image_size * ratio
+            height = self.image_size
             width = self.image_size / ratio
         else:
-            height = ratio * height
             width = self.image_size
+            height = self.image_size * ratio
+
         x = F.interpolate(x,
                           size=(int(height), int(width)),
                           mode="bilinear",

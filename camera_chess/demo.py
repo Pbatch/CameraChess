@@ -92,12 +92,10 @@ def main(dataset):
         tracker, state, change = local(preds, tracker, state, tracker_kwargs, state_kwargs)
         i = 0
 
-        if change or True:
+        if change:
             image = Image.fromarray(image)
             image = visualizer.add_bboxes_from_tracks(image, tracker.tracks)
             image.save(os.path.join('debug', f'{frame}.jpg'))
-            pgn = state.write_pgn()
-            print(pgn)
 
     pgn = state.write_pgn()
     print(pgn)

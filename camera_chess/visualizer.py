@@ -50,7 +50,7 @@ class Visualizer:
         for square, tracks in square_to_tracks.items():
             bbox = tracks[0].bbox
             speed = tracks[0].speed
-            text_items = [f'{track.piece}={track.score:.2f}' for track in tracks]
+            text_items = [f'{track.piece}={track.score:.2f}, {track.square}' for track in tracks]
             if speed > 1.0:
                 text_items.append(f'v={speed:.6f}')
             text = ', '.join(text_items)

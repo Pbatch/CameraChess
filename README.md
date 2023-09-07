@@ -6,7 +6,7 @@
 * Fix data from "camera_chess/data_cleaning/sanity_check.py" script
 * Make better validation set (include outdoor data)
 * Benchmark TFLite model on mobile
-* Fix override
+* Label peter/glass_2 and peter/glass_3
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog
