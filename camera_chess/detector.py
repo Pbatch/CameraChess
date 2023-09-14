@@ -1,6 +1,5 @@
 from collections import namedtuple
 
-import numpy as np
 import torch
 
 from camera_chess.export.wrapped_model import load_model
@@ -9,8 +8,7 @@ Detections = namedtuple("Detections", "xyxy conf cls")
 
 
 class Detector:
-    def __init__(self, keypoints, model_path, device='cpu'):
-        self.keypoints = keypoints
+    def __init__(self, model_path, device='cpu'):
         self.model_path = model_path
         self.device = device
 

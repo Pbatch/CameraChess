@@ -1,14 +1,11 @@
 import argparse
 import os
-from collections import defaultdict
-from copy import deepcopy
 
 import chess
 import cv2
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
 import numpy as np
-import pandas as pd
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -19,42 +16,39 @@ from camera_chess.utils import load_video_config
 from camera_chess.video import Video
 
 
-class Board:
-    MOVE_REWARD = -np.log(0.5)
-
-    def __init__(self):
-        self.board = chess.Board()
-        self.san_stack = []
-        self.idxs = []
-        self.hash = hash(self.board.fen().split(' ', 1)[0])
-        self.legal_moves = list(self.board.legal_moves)
-        self.score = 0
-
-    def push(self, move, score, idx):
-        self.san_stack.append(self.board.san(move))
-        self.idxs.append(idx)
-        self.board.push(move)
-
-        self.hash = hash(self.board.fen().split(' ', 1)[0])
-        self.legal_moves = list(self.board.legal_moves)
-        self.score += np.log(score) + self.MOVE_REWARD
-
-    def __str__(self):
-        s = f'{self.score:.2f} '
-        for i, move in enumerate(self.san_stack):
-            if i % 2 == 0:
-                s += f'{(i + 2) // 2}. {str(move)}'
-            else:
-                s += f' {str(move)} '
-        return s
+def _xy_to_square(x, y):
+    return f'{chr(x + 97)}{8 - y}'
 
 
-class Tracker:
+def _square_to_xy(square):
+    x = ord(square[0]) - 97
+    y = 8 - int(square[1])
+    return x, y
+
+
+def _init_state():
+    state = np.zeros((8, 8, len(CLASSES)), dtype=np.float32)
+    for square, piece in SQUARE_TO_PIECE.items():
+        x, y = _square_to_xy(square)
+        cls_idx = CLASSES.index(piece)
+        state[x][y][cls_idx] = 1.0
+    return state
+
+
+def _update_state(state, arr, decay=0.5):
+    state *= decay
+    x = arr[:, 0].astype(np.int32)
+    y = arr[:, 1].astype(np.int32)
+    conf = arr[:, 2]
+    cls = arr[:, 3].astype(np.int32)
+    state[x, y, cls] += (1 - decay) * conf
+
+
+class Creator:
     PLOT_SIZE = 64
 
     def __init__(self, dataset):
         self.dataset = dataset
-
         self.video_config = load_video_config(self.dataset)
         self.video = Video(self.video_config, target_fps=8)
 
@@ -66,16 +60,6 @@ class Tracker:
         self.scalar_map = cmx.ScalarMappable(norm=norm, cmap=cmap)
 
     @staticmethod
-    def _xy_to_square(x, y):
-        return f'{chr(x + 97)}{8 - y}'
-
-    @staticmethod
-    def _square_to_xy(square):
-        x = ord(square[0]) - 97
-        y = 8 - int(square[1])
-        return x, y
-
-    @staticmethod
     def _perspective_transform(src, matrix):
         homo_src = src.transpose(1, 0, 2)
         homo_src = np.concatenate([homo_src, np.ones((len(homo_src), 1, 1))], axis=2)
@@ -85,19 +69,30 @@ class Tracker:
         warped_src = warped_src.transpose(1, 0, 2)
         return warped_src
 
-    def _update_state(self, state, df, decay=0.5):
-        state *= decay
-        for square, conf, cls in zip(*[df[s] for s in ['square', 'conf', 'cls']]):
-            x, y = self._square_to_xy(square)
-            state[x][y][cls] += (1 - decay) * conf
+    def _get_nearest_xy(self, center):
+        idx = np.argmin(np.sum((center - self.square_centers) ** 2, axis=1))
+        x = idx // 8
+        y = idx % 8
+        return x, y
 
-    def _init_state(self):
-        state = np.zeros((8, 8, len(CLASSES)), dtype=np.float32)
-        for square, piece in SQUARE_TO_PIECE.items():
-            x, y = self._square_to_xy(square)
-            cls_idx = CLASSES.index(piece)
-            state[x][y][cls_idx] = 1.0
-        return state
+    def _is_out_of_bounds(self, center):
+        for i in range(4):
+            v1 = self.boundary[i - 1] - self.boundary[i]
+            v2 = center - self.boundary[i]
+            cross_products = np.cross(v1, v2)
+            if cross_products < 0:
+                return True
+        return False
+
+    def _warp(self, src):
+        target = np.array([[BOARD_SIZE, BOARD_SIZE],
+                           [0, BOARD_SIZE],
+                           [0, 0],
+                           [BOARD_SIZE, 0]], dtype=np.float32)
+        matrix = self._get_perspective_transform(target)
+        inv_matrix = np.linalg.inv(matrix)
+        warped_src = self._perspective_transform(np.expand_dims(src, axis=0), inv_matrix)[0]
+        return warped_src
 
     def _get_perspective_transform(self, target):
         A = np.zeros((8, 8), dtype=np.float32)
@@ -115,52 +110,6 @@ class Tracker:
         matrix = np.append(matrix, 1.0)
         matrix = matrix.reshape((3, 3))
         return matrix
-
-    def _warp(self, src):
-        target = np.array([[BOARD_SIZE, BOARD_SIZE],
-                           [0, BOARD_SIZE],
-                           [0, 0],
-                           [BOARD_SIZE, 0]], dtype=np.float32)
-        matrix = self._get_perspective_transform(target)
-        inv_matrix = np.linalg.inv(matrix)
-        warped_src = self._perspective_transform(np.expand_dims(src, axis=0), inv_matrix)[0]
-        return warped_src
-
-    def _get_nearest_square(self, center):
-        idx = np.argmin(np.sum((center - self.square_centers) ** 2, axis=1))
-        x = idx // 8
-        y = idx % 8
-        return self._xy_to_square(x, y)
-
-    def _is_out_of_bounds(self, center):
-        for i in range(4):
-            v1 = self.boundary[i - 1] - self.boundary[i]
-            v2 = center - self.boundary[i]
-            cross_products = np.cross(v1, v2)
-            if cross_products < 0:
-                return True
-        return False
-
-    def _create_sequence(self, sequence_path):
-        detector = Detector(model_path='models/480L.pt',
-                            device='cuda')
-        sequence = []
-        for i, (image, frame) in tqdm(enumerate(self.video), desc='Frame'):
-            preds = detector.run(np.expand_dims(image, axis=0))[0]
-
-            for pred in preds:
-                center = np.array([(pred[0] + pred[2]) / 2,
-                                   pred[3] - ((pred[2] - pred[0]) / 4)])
-                oob = self._is_out_of_bounds(center)
-                if oob:
-                    continue
-
-                square = self._get_nearest_square(center)
-                new_pred = [i, *pred[:5], int(pred[5]), square]
-                sequence.append(new_pred)
-
-        df = pd.DataFrame(sequence, columns=['idx', 'l', 't', 'r', 'b', 'conf', 'cls', 'square'])
-        df.to_csv(sequence_path, index=False)
 
     def _plot_state(self, state, thr=0.2):
         size = (8 * self.PLOT_SIZE + 1, 8 * self.PLOT_SIZE + 1)
@@ -182,16 +131,41 @@ class Tracker:
                            fill='black')
         return image
 
-    def _create_video(self, sequence_path):
-        df = pd.read_csv(sequence_path)
+    def create_sequence(self, sequence_path):
+        if os.path.isfile(sequence_path):
+            return
+
+        detector = Detector(model_path='models/480L.pt',
+                            device='cuda')
+        sequence = []
+        for i, (image, frame) in tqdm(enumerate(self.video), desc='Frame'):
+            preds = detector.run(np.expand_dims(image, axis=0))[0]
+
+            for pred in preds:
+                center = np.array([(pred[0] + pred[2]) / 2,
+                                   pred[3] - ((pred[2] - pred[0]) / 4)])
+                oob = self._is_out_of_bounds(center)
+                if oob:
+                    continue
+
+                x, y = self._get_nearest_xy(center)
+                new_pred = [i, x, y, pred[-2], pred[-1]]
+                sequence.append(new_pred)
+
+        np.save(sequence_path, sequence)
+
+    def create_video(self, sequence_path):
+        sequence = np.load(sequence_path)
 
         size = (8 * self.PLOT_SIZE + 1, 8 * self.PLOT_SIZE + 1)
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         writer = cv2.VideoWriter('video.mp4', fourcc, self.video.target_fps, size)
 
-        state = self._init_state()
-        for _, idx_df in tqdm(df.groupby('idx')):
-            self._update_state(state, idx_df)
+        state = _init_state()
+        idxs, breakpoints = np.unique(sequence[:, 0], return_index=True)
+        arrs = np.split(sequence[:, 1:], breakpoints[1:])
+        for idx, arr in tqdm(zip(idxs, arrs), total=len(idxs)):
+            _update_state(state, arr)
 
             image = self._plot_state(state)
             data = np.array(image)
@@ -199,69 +173,122 @@ class Tracker:
 
         writer.release()
 
-    def _parse_sequence(self, sequence_path):
-        df = pd.read_csv(sequence_path)
 
-        state = self._init_state()
-        new_boards = [Board()]
-        for idx, idx_df in tqdm(df.groupby('idx')):
-            self._update_state(state, idx_df)
+class Candidate:
+    MOVE_PENALTY = 2.5
 
-            old_boards = new_boards
-            hash_to_candidates = defaultdict(list)
-            for board in old_boards:
-                hash_to_candidates[board.hash].append(board)
+    def __init__(self):
+        self.board = chess.Board()
+        self.san_stack = []
+        self.score = 0
 
-                best_move = None
-                best_score = 0
-                for move in board.legal_moves:
-                    piece = PIECE_TO_CLASS[board.board.piece_at(move.from_square)]
-                    cls = CLASSES.index(piece)
+    def calculate_hash(self):
+        return hash(self.board.fen().split(' ', 1)[0])
 
-                    from_square = chess.square_name(move.from_square)
-                    from_x, from_y = self._square_to_xy(from_square)
-                    from_score = state[from_x][from_y][cls]
+    def calculate_score(self, state, move):
+        probs = np.zeros(64, dtype=np.float32)
+        piece_map = self.board.piece_map()
+        for square in range(64):
+            piece = piece_map.get(square, None)
+            x, y = _square_to_xy(chess.square_name(square))
+            if piece is None:
+                p = 1 - max(state[x][y])
+            else:
+                cls = CLASSES.index(PIECE_TO_CLASS[piece])
+                p = state[x][y][cls]
+            probs[square] = p
+        score = np.sum(np.log(probs + 0.01))
+        if move is not None:
+            score -= self.MOVE_PENALTY
+        return score
 
-                    to_square = chess.square_name(move.to_square)
-                    to_x, to_y = self._square_to_xy(to_square)
-                    to_score = state[to_x][to_y][cls]
+    def push(self, move):
+        if move is not None:
+            self.san_stack.append(self.board.san(move))
+            self.board.push(move)
 
-                    score = to_score * (1 - from_score)
-                    if score > best_score:
-                        best_score = score
-                        best_move = move
+    def pop(self, move):
+        if move is not None:
+            self.san_stack.pop()
+            self.board.pop()
 
-                if best_move is None:
-                    continue
+    def __str__(self):
+        s = f'{self.score:.2f} '
+        for i, move in enumerate(self.san_stack):
+            if i % 2 == 0:
+                s += f'{(i + 2) // 2}. {str(move)}'
+            else:
+                s += f' {str(move)} '
+        return s
 
-                if Board.MOVE_REWARD + np.log(best_score) < 0:
-                    continue
 
-                new_board = deepcopy(board)
-                new_board.push(best_move, best_score, idx)
-                hash_to_candidates[new_board.hash].append(new_board)
+class Tracker:
+    def _process_point(self, state, arr, new_candidates):
+        _update_state(state, arr)
 
-            candidates = []
-            for v in hash_to_candidates.values():
-                candidate = min(v, key=lambda x: x.idxs)
-                candidate.score = max(v, key=lambda x: x.score).score
-                candidates.append(candidate)
-            new_boards = sorted(candidates, key=lambda x: x.score, reverse=True)[:5]
+        old_candidates = new_candidates
+        new_candidates = []
+        seen = set()
+        for candidate in old_candidates:
+            moves = list(candidate.board.legal_moves) + [None]
+            for move in moves:
+                candidate.push(move)
 
-        print(new_boards[0])
+                hash_ = candidate.calculate_hash()
+                if hash_ not in seen:
+                    seen.add(hash_)
 
-    def run(self):
-        sequence_path = f'{self.dataset.replace("/", "_")}_sequence.npy'
-        if not os.path.isfile(sequence_path):
-            self._create_sequence(sequence_path)
+                    score = candidate.calculate_score(state, move)
 
-        # self._create_video(sequence_path)
-        self._parse_sequence(sequence_path)
+                    valid = False
+                    if len(new_candidates) < 3:
+                        valid = True
+                    elif score > new_candidates[-1].score:
+                        new_candidates.pop()
+                        valid = True
+
+                    if valid:
+                        new_candidate = Candidate()
+                        new_candidate.san_stack = candidate.san_stack[:]
+                        new_candidate.board = candidate.board.copy(stack=False)
+                        new_candidate.score = score
+                        new_candidates.append(new_candidate)
+
+                    new_candidates.sort(key=lambda x: x.score, reverse=True)
+                candidate.pop(move)
+
+        return new_candidates
+
+    def process_sequence(self, sequence_path):
+        sequence = np.load(sequence_path)
+
+        logs = []
+        state = _init_state()
+        init_candidate = Candidate()
+        init_candidate.score = init_candidate.calculate_score(state, None)
+        new_candidates = [init_candidate]
+
+        idxs, breakpoints = np.unique(sequence[:, 0], return_index=True)
+        arrs = np.split(sequence[:, 1:], breakpoints[1:])
+        for idx, arr in tqdm(zip(idxs, arrs), total=len(idxs)):
+            new_candidates = self._process_point(state, arr, new_candidates)
+
+            if idx % 10 == 0:
+                for candidate in new_candidates:
+                    logs.append(f'{idx} {candidate}')
+
+        with open('logs.txt', 'w') as f:
+            f.write('\n'.join(logs))
 
 
 def main(dataset):
-    tracker = Tracker(dataset)
-    tracker.run()
+    sequence_path = f'{dataset.replace("/", "_")}_sequence.npy'
+
+    # creator = Creator(dataset)
+    # creator.create_sequence(sequence_path)
+
+    tracker = Tracker()
+    tracker.process_sequence(sequence_path)
 
 
 if __name__ == '__main__':

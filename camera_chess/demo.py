@@ -66,7 +66,6 @@ def main(dataset):
     video = Video(video_config, target_fps=8)
     video.save_start_image()
     detector = Detector(model_path='models/480L.pt',
-                        keypoints=video.new_keypoints,
                         device='cuda')
     visualizer = Visualizer()
     tracker_kwargs = {'fps': video.target_fps,
