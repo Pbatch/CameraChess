@@ -7,7 +7,6 @@ import matplotlib.cm as cmx
 import matplotlib.colors as colors
 import numpy as np
 from PIL import Image, ImageDraw
-from icecream import ic
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -18,16 +17,13 @@ from camera_chess.video import Video
 
 
 def _square_to_xy(square):
-    x = ord(square[0]) - 97
-    y = 8 - int(square[1])
+    x = 104 - ord(square[0])
+    y = int(square[1]) - 1
     return x, y
 
 
 def _xy_to_square(x, y):
-    # 0, 0 -> h1
-    # 0, 1 -> h2
-    # 1, 0 -> g1
-    return f'{chr((7 - x) + 97)}{y + 1}'
+    return f'{chr(104 - x)}{y + 1}'
 
 
 def _init_state():
@@ -103,7 +99,7 @@ class Creator:
 
 
 class Candidate:
-    MOVE_PENALTY = 3.0
+    MOVE_REWARD = -np.log(0.5)
 
     def __init__(self):
         self.board = chess.Board()
@@ -114,20 +110,20 @@ class Candidate:
         return hash(self.board.fen().split(' ', 1)[0])
 
     def calculate_score(self, state, move):
-        probs = np.zeros(64, dtype=np.float32)
-        piece_map = self.board.piece_map()
-        for i in range(64):
-            x = i // 8
-            y = i % 8
-            square = _xy_to_square(x, y)
+        if move is None:
+            return self.score
+        piece = PIECE_TO_CLASS[self.board.piece_at(move.to_square)]
+        cls = CLASSES.index(piece)
 
-            piece = piece_map.get(chess.parse_square(square), 'empty')
-            cls = CLASSES.index(PIECE_TO_CLASS[piece])
-            p = state[i][cls]
-            probs[i] = p
-        score = np.sum(np.log(probs + 0.01))
-        if move is not None:
-            score -= self.MOVE_PENALTY
+        from_square = chess.square_name(move.from_square)
+        from_x, from_y = _square_to_xy(from_square)
+        from_score = state[8 * from_x + from_y][-1]
+
+        to_square = chess.square_name(move.to_square)
+        to_x, to_y = _square_to_xy(to_square)
+        to_score = state[8 * to_x + to_y][cls]
+
+        score = self.score + np.log(from_score) + np.log(to_score) + self.MOVE_REWARD
         return score
 
     def push(self, move):

@@ -284,8 +284,8 @@ class Tracker:
 def main(dataset):
     sequence_path = f'{dataset.replace("/", "_")}_sequence.npy'
 
-    # creator = Creator(dataset)
-    # creator.create_sequence(sequence_path)
+    creator = Creator(dataset)
+    creator.create_sequence(sequence_path)
 
     tracker = Tracker()
     tracker.process_sequence(sequence_path)
