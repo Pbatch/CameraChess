@@ -12,13 +12,13 @@ from torch.utils.data import DataLoader
 from torchvision import models
 from torchvision.models import MobileNet_V3_Large_Weights, MobileNet_V3_Small_Weights
 
-from camera_chess.constants import CLASSIFIER_CLASSES, CLASSIFIER_DIR
+from camera_chess.constants import CLASSES, CLASSIFIER_DIR
 
 
 def load_model(checkpoint_path):
     # model = models.mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
     model = models.mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
-    model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, len(CLASSIFIER_CLASSES))
+    model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, len(CLASSES))
     if checkpoint_path is not None:
         state_dict = torch.load(checkpoint_path)['state_dict']
         new_state_dict = {}
@@ -49,7 +49,7 @@ class ChessDataset(torch.utils.data.Dataset):
 
         basename = os.path.basename(image_path)
         cls = os.path.splitext(basename)[0].split('_')[-1]
-        y = CLASSIFIER_CLASSES.index(cls)
+        y = CLASSES.index(cls)
 
         return x, y
 

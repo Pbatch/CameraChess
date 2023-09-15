@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from camera_chess.classifier import ChessDataset
 from camera_chess.classifier import load_model
-from camera_chess.constants import DATA_DIR, MARGIN, SQUARE_SIZE, CLASSIFIER_CLASSES
+from camera_chess.constants import DATA_DIR, MARGIN, SQUARE_SIZE
 from camera_chess.data_cleaning.make_classifier_data import warp_chessboard_image
 
 
@@ -49,7 +49,6 @@ class MobileDetector:
         self.fill_batch(image, keypoints)
         res = self.model(self.batch)
         probs = nn.functional.softmax(res, dim=1).detach().cpu().numpy()
-        probs = probs.reshape(8, 8, len(CLASSIFIER_CLASSES))
         return probs
 
 
@@ -75,7 +74,6 @@ def main():
         probs = detector.run(image, keypoints)
         print(probs)
         exit(1)
-
 
 
 if __name__ == '__main__':
