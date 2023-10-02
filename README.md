@@ -2,7 +2,6 @@
 
 ## TODO
 * Label more data from outdoors
-* Try beam search in tracker
 * Fix data from "camera_chess/data_cleaning/sanity_check.py" script
 * Make better validation set (include outdoor data)
 * Benchmark TFLite model on mobile

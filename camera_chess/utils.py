@@ -70,3 +70,11 @@ def serialize(obj):
 
 def deserialize(s):
     return pickle.loads(s.encode("ISO-8859-1"))
+
+
+def update_state(state, arr, decay=0.5):
+    state *= decay
+    square = arr[:, 0].astype(np.int32)
+    conf = arr[:, 5]
+    cls = arr[:, 6].astype(np.int32)
+    state[square, cls] += (1 - decay) * conf

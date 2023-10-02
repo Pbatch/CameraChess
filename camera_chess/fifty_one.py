@@ -4,16 +4,11 @@ import os
 from glob import glob
 
 import fiftyone as fo
-from tqdm import tqdm
-import numpy as np
-
-from camera_chess.constants import DATA_DIR, CLASSES, CORNERS
-from camera_chess.export.wrapped_model import load_model
-from torchmetrics.detection import MeanAveragePrecision
-from torchvision.transforms import Compose, PILToTensor
 import torch
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
-from PIL import Image
+from tqdm import tqdm
+
+from camera_chess.constants import DATA_DIR, CLASSES, CORNERS
 
 
 def load_label_studio():
@@ -126,7 +121,8 @@ def load_yolo(pred_dir):
 
     dataset = fo.Dataset()
     dataset.add_samples(samples)
-    dataset = dataset.sort_by('ap')
+    if pred_dir is not None:
+        dataset = dataset.sort_by('ap')
     dataset.save()
 
     return dataset
