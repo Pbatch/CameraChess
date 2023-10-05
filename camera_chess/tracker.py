@@ -89,9 +89,9 @@ class Tracker:
                     pgn += f'{(move_count + 2) // 2}. '
                 pgn += f'{san_move} '
                 move_count += 1
-                logs[i] = {"moves": ' '.join(best_moves["san"]),
-                           "score": best_joint_score,
-                           "pgn": pgn}
+                logs[str(i)] = {"moves": ' '.join(best_moves["san"]),
+                                "score": best_joint_score,
+                                "pgn": pgn}
                 ic(best_moves['san'][0])
                 ic(best_joint_score)
                 ic(pgn)

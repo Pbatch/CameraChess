@@ -73,10 +73,10 @@ def main(dataset):
         _, idx = np.unique(dets[:, 1], return_index=True)
         dets = dets[idx]
 
-        for square, l, t, r, b in dets[:, 1:6]:
+        for square, l, t, r, b, conf in dets[:, 1:]:
             square = int(square)
             piece = board.piece_at(square)
-            if piece is None:
+            if piece is None or conf < 0.3:
                 continue
             cls = PIECE_TO_CLASS[piece]
             label = labels_template.copy()
