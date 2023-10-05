@@ -4,10 +4,11 @@ import os
 
 import chess
 import chess.pgn
+import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import CORNERS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR, PIECE_TO_CLASS
+from camera_chess.constants import CORNERS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR, PIECE_TO_CLASS, DATA_DIR
 from camera_chess.sequence_generator import SequenceGenerator
 from camera_chess.tracker import Tracker
 from camera_chess.utils import load_video_config, clear_dir
@@ -34,19 +35,20 @@ def main(dataset):
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    sequence_path = f'{dataset.replace("/", "_")}_sequence.npy'
-    logs_path = f'{os.path.splitext(os.path.basename(sequence_path))[0]}_logs.json'
+    sequence_path = os.path.join(DATA_DIR, dataset, 'sequence.npy')
+    boxes_path = os.path.join(DATA_DIR, dataset, 'boxes.npy')
+    logs_path = os.path.join(DATA_DIR, dataset, 'logs.json')
+
     sequence_generator = SequenceGenerator(dataset)
-    sequence = sequence_generator.create_sequence(sequence_path)
+    _, boxes = sequence_generator.create_sequence(sequence_path, boxes_path)
 
     tracker = Tracker()
     logs = tracker.process_sequence(sequence_path, logs_path)
-    board = chess.Board(fen=video_config.fen)
 
+    board = chess.Board(fen=video_config.fen)
     for i, (image, frame) in tqdm(enumerate(sequence_generator.video), desc='Frame', total=len(video)):
-        key = str(float(i))
         try:
-            log = logs[key]
+            log = logs[str(i)]
         except KeyError:
             continue
 
@@ -67,12 +69,14 @@ def main(dataset):
                            'to_name': 'img-1',
                            'type': 'rectanglelabels'}
 
-        dets = sequence[sequence[:, 0] == i]
-        used = set()
-        for square, l, t, r, b, conf in dets[:, 1:-1]:
+        dets = boxes[boxes[:, 0] == i]
+        _, idx = np.unique(dets[:, 1], return_index=True)
+        dets = dets[idx]
+
+        for square, l, t, r, b in dets[:, 1:6]:
             square = int(square)
             piece = board.piece_at(square)
-            if square in used or piece is None:
+            if piece is None:
                 continue
             cls = PIECE_TO_CLASS[piece]
             label = labels_template.copy()
@@ -82,8 +86,6 @@ def main(dataset):
                               'height': 100 * (b - t) / video.height,
                               'rectanglelabels': [cls]}
             d['annotations'][0]['result'].append(label)
-
-            used.add(square)
 
         with open(os.path.join(STUDIO_LABEL_DIR, f'{frame}.json'), 'w') as f:
             json.dump(d, f, indent=4)

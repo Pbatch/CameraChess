@@ -85,14 +85,16 @@ class SequenceGenerator:
 
     def _is_out_of_bounds(self, center):
         for i in range(4):
-            v1 = self.boundary[i - 1] - self.boundary[i]
-            v2 = center - self.boundary[i]
-            cross_products = np.cross(v1, v2)
-            if cross_products < 0:
+            a = self.boundary[i - 1][0] - self.boundary[i][0]
+            b = self.boundary[i - 1][1] - self.boundary[i][1]
+            c = center[0] - self.boundary[i][0]
+            d = center[1] - self.boundary[i][1]
+            cross_product = (a * d) - (b * c)
+            if cross_product < 0:
                 return True
         return False
 
-    def _plot_state(self, state, from_square, to_square, thr=0.2):
+    def _plot_state(self, state, from_square, to_square, thr=0.7):
         size = (8 * self.PLOT_SIZE + 1, 8 * self.PLOT_SIZE + 1)
         image = Image.new('RGB', size)
         d = ImageDraw.Draw(image)
@@ -104,7 +106,7 @@ class SequenceGenerator:
             x = square % 8
             y = 7 - (square // 8)
             bbox = [self.PLOT_SIZE * i for i in [x, y, (x + 1), (y + 1)]]
-            fill = colors.rgb2hex(self.scalar_map.to_rgba(score))
+            fill = colors.rgb2hex(self.scalar_map.to_rgba((score - thr) / (1 - thr)))
 
             if square in {from_square, to_square}:
                 outline = "yellow"
@@ -120,32 +122,44 @@ class SequenceGenerator:
                        fill='black')
         return image
 
-    def create_sequence(self, sequence_path):
-        if os.path.isfile(sequence_path):
+    def create_sequence(self, sequence_path, boxes_path):
+        if os.path.isfile(sequence_path) and os.path.isfile(boxes_path):
             sequence = np.load(sequence_path)
-            return sequence
+            boxes = np.load(boxes_path)
+            return sequence, boxes
 
         detector = Detector(model_path='models/480L.pt',
                             device='cuda')
-        sequence = []
+        sequence = np.zeros((len(self.video), 64, len(CLASSES)))
+        boxes = []
         for i, (image, frame) in tqdm(enumerate(self.video), desc='Frame'):
             preds = detector.run(np.expand_dims(image, axis=0))[0]
 
-            for pred in preds:
-                center = np.array([(pred[0] + pred[2]) / 2,
-                                   pred[3] - ((pred[2] - pred[0]) / 4)])
-                oob = self._is_out_of_bounds(center)
+            cx = (preds[:, 0] + preds[:, 2]) / 2
+            cy = preds[:, 3] - ((preds[:, 2] - preds[:, 0]) / 3)
+            box_centers = np.vstack((cx, cy)).T
+
+            dist = np.sum(np.square(np.expand_dims(box_centers, 1) - np.expand_dims(self.centers, 0)), axis=2)
+            squares = np.argmin(dist, axis=1)
+            for square, box_center, pred in zip(squares, box_centers, preds):
+                oob = self._is_out_of_bounds(box_center)
                 if oob:
                     continue
 
-                square = self._get_nearest_square(center)
-                new_pred = [i, square, *pred]
-                sequence.append(new_pred)
+                for k in range(len(CLASSES)):
+                    sequence[i][square][k] = max(sequence[i][square][k], pred[4 + k])
+
+                conf = max(pred[4:])
+                boxes.append([i, square, *pred[:4], conf])
 
         sequence = np.asarray(sequence)
         np.save(sequence_path, sequence)
 
-        return sequence
+        boxes = np.asarray(boxes)
+        boxes = boxes[(-boxes[:, -1]).argsort()]
+        np.save(boxes_path, boxes)
+
+        return sequence, boxes
 
     def create_video(self, sequence_path, video_path, logs_path=None):
         sequence = np.load(sequence_path)
@@ -161,17 +175,14 @@ class SequenceGenerator:
         writer = cv2.VideoWriter(video_path, fourcc, self.video.target_fps, size)
 
         state = np.zeros((64, len(CLASSES)), dtype=np.float32)
-        idxs, breakpoints = np.unique(sequence[:, 0], return_index=True)
-        arrs = np.split(sequence[:, 1:], breakpoints[1:])
         from_square = None
         to_square = None
         board = chess.Board()
-        for idx, arr in tqdm(zip(idxs, arrs), total=len(idxs)):
-            update_state(state, arr)
+        for i in range(len(sequence)):
+            update_state(state, sequence[i])
 
-            idx = str(idx)
-            if idx in logs:
-                d = logs[idx]
+            if i in logs:
+                d = logs[i]
                 uci_move = board.parse_san(d['moves'].split()[0])
                 board.push(uci_move)
                 from_square = uci_move.from_square

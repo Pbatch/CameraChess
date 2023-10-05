@@ -4,26 +4,32 @@ import os
 
 import chess
 import numpy as np
+from icecream import ic
 from tqdm import tqdm
 
-from camera_chess.constants import CLASSES
+from camera_chess.constants import CLASSES, DATA_DIR
 from camera_chess.move_data_generator import MoveDataGenerator
 from camera_chess.sequence_generator import SequenceGenerator
 from camera_chess.utils import update_state
 
 
 class Tracker:
+    def __init__(self, from_thr=0.6, to_thr=0.6, decay=0.5):
+        self.from_thr = from_thr
+        self.to_thr = to_thr
+        self.decay = decay
+
     def _calculate_score(self, state, move):
         score = 0
         for square in move['from']:
-            score += 1 - max(state[square]) - 0.7
+            score += 1 - max(state[square]) - self.from_thr
 
         for square, target in zip(move['to'], move['targets']):
-            score += state[square][target] - 0.7
+            score += state[square][target] - self.to_thr
 
         return score
 
-    def _process_point(self, state, move_data):
+    def _process_point(self, state, move_data, possible_moves):
         best_move = None
         best_moves = None
         best_score_1 = -float('inf')
@@ -31,6 +37,8 @@ class Tracker:
         best_joint_score = -float('inf')
         for d in move_data:
             score_1 = self._calculate_score(state, d["move1"])
+            if score_1 > 0:
+                possible_moves.add(d["move1"]["san"])
             if score_1 > best_score_1:
                 best_score_1 = score_1
                 best_move = d["move1"]
@@ -49,7 +57,7 @@ class Tracker:
                 best_joint_score = joint_score
                 best_moves = d["moves"]
 
-        return best_score_1, best_score_2, best_joint_score, best_move, best_moves
+        return best_score_1, best_score_2, best_joint_score, best_move, best_moves, possible_moves
 
     def process_sequence(self, sequence_path, logs_path):
         if os.path.isfile(logs_path):
@@ -62,21 +70,33 @@ class Tracker:
         logs = {}
         state = np.zeros((64, len(CLASSES)), dtype=np.float32)
         board = chess.Board()
+        pgn = ''
+        move_count = 0
         move_data_generator = MoveDataGenerator()
         move_data = move_data_generator.run(board)
+        possible_moves = set()
 
-        idxs, breakpoints = np.unique(sequence[:, 0], return_index=True)
-        arrs = np.split(sequence[:, 1:], breakpoints[1:])
-        for idx, arr in tqdm(zip(idxs, arrs), total=len(idxs)):
-            update_state(state, arr)
-            best_score_1, best_score_2, best_joint_score, best_move, best_moves = self._process_point(state, move_data)
+        for i in tqdm(range(len(sequence))):
+            update_state(state, sequence[i], self.decay)
+            best_score_1, best_score_2, best_joint_score, best_move, best_moves, possible_moves = \
+                self._process_point(state, move_data, possible_moves)
 
-            if best_joint_score > 0:
-                board.push(board.parse_san(best_moves["san"][0]))
-                logs[idx] = {"moves": ' '.join(best_moves["san"]),
-                             "score": best_joint_score,
-                             "stack": ' '.join([move.uci() for move in board.move_stack])}
+            if best_joint_score > 0 and best_moves["san"][0] in possible_moves:
+                ic(possible_moves)
+                san_move = best_moves["san"][0]
+                board.push(board.parse_san(san_move))
+                if move_count % 2 == 0:
+                    pgn += f'{(move_count + 2) // 2}. '
+                pgn += f'{san_move} '
+                move_count += 1
+                logs[i] = {"moves": ' '.join(best_moves["san"]),
+                           "score": best_joint_score,
+                           "pgn": pgn}
+                ic(best_moves['san'][0])
+                ic(best_joint_score)
+                ic(pgn)
                 move_data = move_data_generator.run(board)
+                possible_moves = set()
 
         with open(logs_path, 'w') as f:
             json.dump(logs, f, indent=2)
@@ -85,17 +105,18 @@ class Tracker:
 
 
 def main(dataset):
-    sequence_path = f'{dataset.replace("/", "_")}_sequence.npy'
-    logs_path = f'{os.path.splitext(os.path.basename(sequence_path))[0]}_logs.json'
-    video_path = f'{os.path.splitext(os.path.basename(sequence_path))[0]}_video.mp4'
+    sequence_path = os.path.join(DATA_DIR, dataset, 'sequence.npy')
+    boxes_path = os.path.join(DATA_DIR, dataset, 'boxes.npy')
+    logs_path = os.path.join(DATA_DIR, dataset, 'logs.json')
+    video_path = os.path.join(DATA_DIR, dataset, 'video.mp4')
 
     sequence_generator = SequenceGenerator(dataset)
-    # creator.create_sequence(sequence_path)
+    sequence_generator.create_sequence(sequence_path, boxes_path)
 
     tracker = Tracker()
     tracker.process_sequence(sequence_path, logs_path)
 
-    sequence_generator.create_video(sequence_path, video_path, logs_path)
+    # sequence_generator.create_video(sequence_path, video_path, logs_path)
 
 
 if __name__ == '__main__':

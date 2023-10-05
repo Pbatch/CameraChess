@@ -15,10 +15,10 @@ class MoveDataGenerator:
 
     @staticmethod
     def _get_piece_idx(move, board):
-        if move.promotion is None:
-            piece = board.piece_at(move.from_square)
-        else:
-            piece = move.promotion
+        piece = board.piece_at(move.from_square)
+        if move.promotion is not None:
+            piece = chess.Piece(piece_type=move.promotion,
+                                color=piece.color)
         piece_idx = CLASSES.index(PIECE_TO_CLASS[piece])
         return piece_idx
 

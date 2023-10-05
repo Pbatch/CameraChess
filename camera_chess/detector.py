@@ -17,6 +17,5 @@ class Detector:
     def run(self, images):
         images = torch.tensor(images, device=self.device)
         pred = self.model(images).detach().cpu().numpy()
-        pred = [pred[pred[:, 0] == i, 1:].tolist() for i in range(len(images))]
 
         return pred
