@@ -29,6 +29,8 @@ def load_video_config(dataset):
     if 'fen' not in d:
         # Starting position
         d['fen'] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    if 'url' not in d:
+        d['url'] = 'n/a'
     video_config_ = video_config(start=d['start'],
                                  end=d['end'],
                                  url=d['url'],
