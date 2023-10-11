@@ -25,7 +25,7 @@ def load_video_config(dataset):
 
     with open(os.path.join(DATA_DIR, 'video_config.yaml')) as f:
         config = yaml.safe_load(f)
-    d = config[dataset]
+    d = config[dataset.replace('\\', '/')]
     if 'fen' not in d:
         # Starting position
         d['fen'] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

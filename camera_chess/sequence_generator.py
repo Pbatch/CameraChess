@@ -6,11 +6,13 @@ import cv2
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
 import numpy as np
+import torch
+import torchvision
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP
+from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP, DATA_DIR
 from camera_chess.detector import Detector
 
 from camera_chess.utils import load_video_config, update_state
@@ -30,6 +32,10 @@ class SequenceGenerator:
         cmap = plt.get_cmap('Blues')
         norm = colors.Normalize(vmin=0.0, vmax=1.0)
         self.scalar_map = cmx.ScalarMappable(norm=norm, cmap=cmap)
+
+        self.sequence_path = os.path.join(DATA_DIR, dataset, 'sequence.npy')
+        self.boxes_path = os.path.join(DATA_DIR, dataset, 'boxes.npy')
+        self.video_path = os.path.join(DATA_DIR, dataset, 'debug.mp4')
 
     @staticmethod
     def _perspective_transform(src, matrix):
@@ -61,6 +67,13 @@ class SequenceGenerator:
         matrix = matrix.reshape((3, 3))
         return matrix
 
+    @staticmethod
+    def _get_box_centers(preds):
+        cx = (preds[:, 0] + preds[:, 2]) / 2
+        cy = preds[:, 3] - ((preds[:, 2] - preds[:, 0]) / 3)
+        box_centers = np.vstack((cx, cy)).T
+        return box_centers
+
     def _get_centers_and_boundary(self, keypoints):
         target = np.array([[BOARD_SIZE, BOARD_SIZE],
                            [0, BOARD_SIZE],
@@ -79,20 +92,22 @@ class SequenceGenerator:
 
         return centers, boundary
 
-    def _get_nearest_square(self, center):
-        square = np.argmin(np.sum((center - self.centers) ** 2, axis=1))
-        return square
+    def _get_squares(self, box_centers, oob):
+        squares = -np.ones(len(box_centers), dtype=np.int32)
+        dist = np.sum(np.square(np.expand_dims(box_centers[~oob], 1) - np.expand_dims(self.centers, 0)), axis=2)
+        squares[~oob] = np.argmin(dist, axis=1)
+        return squares
 
-    def _is_out_of_bounds(self, center):
+    def _get_oob(self, box_centers):
+        oob = np.zeros(len(box_centers), dtype=bool)
         for i in range(4):
             a = self.boundary[i - 1][0] - self.boundary[i][0]
             b = self.boundary[i - 1][1] - self.boundary[i][1]
-            c = center[0] - self.boundary[i][0]
-            d = center[1] - self.boundary[i][1]
+            c = box_centers[:, 0] - self.boundary[i][0]
+            d = box_centers[:, 1] - self.boundary[i][1]
             cross_product = (a * d) - (b * c)
-            if cross_product < 0:
-                return True
-        return False
+            oob[cross_product < 0] = True
+        return oob
 
     def _plot_state(self, state, from_square, to_square, thr=0.7):
         size = (8 * self.PLOT_SIZE + 1, 8 * self.PLOT_SIZE + 1)
@@ -122,47 +137,60 @@ class SequenceGenerator:
                        fill='black')
         return image
 
-    def create_sequence(self, sequence_path, boxes_path):
-        if os.path.isfile(sequence_path) and os.path.isfile(boxes_path):
-            sequence = np.load(sequence_path)
-            boxes = np.load(boxes_path)
+    def create_sequence(self, force=False):
+        if os.path.isfile(self.sequence_path) and os.path.isfile(self.boxes_path) and not force:
+            sequence = np.load(self.sequence_path)
+            boxes = np.load(self.boxes_path)
             return sequence, boxes
 
         detector = Detector(model_path='models/480L.pt',
                             device='cuda')
         sequence = np.zeros((len(self.video), 64, len(CLASSES)))
         boxes = []
-        for i, (image, frame) in tqdm(enumerate(self.video), desc='Frame'):
+        for i, (image, frame) in tqdm(enumerate(self.video), desc='Creating sequence', total=len(self.video)):
             preds = detector.run(np.expand_dims(image, axis=0))[0]
+            conf = np.max(preds[:, 4:], axis=1)
+            conf_mask = conf > 0.1
+            preds = preds[conf_mask]
+            conf = conf[conf_mask]
 
-            cx = (preds[:, 0] + preds[:, 2]) / 2
-            cy = preds[:, 3] - ((preds[:, 2] - preds[:, 0]) / 3)
-            box_centers = np.vstack((cx, cy)).T
+            box_centers = self._get_box_centers(preds)
+            oob = self._get_oob(box_centers)
+            squares = self._get_squares(box_centers, oob)
+            for square, pred in zip(squares[~oob], preds[~oob]):
+                sequence[i][square] = np.maximum(sequence[i][square], pred[4:])
 
-            dist = np.sum(np.square(np.expand_dims(box_centers, 1) - np.expand_dims(self.centers, 0)), axis=2)
-            squares = np.argmin(dist, axis=1)
-            for square, box_center, pred in zip(squares, box_centers, preds):
-                oob = self._is_out_of_bounds(box_center)
-                if oob:
-                    continue
+            squares[oob] = -1
+            sorted_idx = (-conf[~oob]).argsort()
+            unique_idx = np.unique(squares[~oob][sorted_idx], return_index=True)[1]
+            non_oob_keep = np.where(~oob)[0][sorted_idx][unique_idx]
 
-                for k in range(len(CLASSES)):
-                    sequence[i][square][k] = max(sequence[i][square][k], pred[4 + k])
+            nms_idx = torchvision.ops.nms(boxes=torch.tensor(preds[oob, :4]),
+                                          scores=torch.tensor(conf[oob]),
+                                          iou_threshold=0.5).detach().cpu().numpy()
+            oob_keep = np.where(oob)[0][nms_idx]
 
-                conf = max(pred[4:])
-                boxes.append([i, square, *pred[:4], conf])
+            keep = list(set(non_oob_keep) | set(oob_keep))
+            idx = i * np.ones((len(keep), 1), dtype=np.int32)
+            squares = np.expand_dims(squares[keep], axis=1)
+            frame_boxes = preds[keep, :4]
+            max_conf = np.expand_dims(conf[keep], axis=1)
+            cls = np.expand_dims(np.argmax(preds[keep, 4:], axis=1), axis=1)
+            frame_info = np.concatenate([idx, squares, frame_boxes, cls, max_conf], axis=1).tolist()
+
+            boxes.extend(frame_info)
 
         sequence = np.asarray(sequence)
-        np.save(sequence_path, sequence)
+        np.save(self.sequence_path, sequence)
 
         boxes = np.asarray(boxes)
         boxes = boxes[(-boxes[:, -1]).argsort()]
-        np.save(boxes_path, boxes)
+        np.save(self.boxes_path, boxes)
 
         return sequence, boxes
 
-    def create_video(self, sequence_path, video_path, logs_path=None):
-        sequence = np.load(sequence_path)
+    def create_video(self, logs_path=None):
+        sequence = np.load(self.sequence_path)
 
         if logs_path is not None:
             with open(logs_path, 'rb') as f:
@@ -172,17 +200,17 @@ class SequenceGenerator:
 
         size = (8 * self.PLOT_SIZE + 1, 8 * self.PLOT_SIZE + 1)
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-        writer = cv2.VideoWriter(video_path, fourcc, self.video.target_fps, size)
+        writer = cv2.VideoWriter(self.video_path, fourcc, self.video.target_fps, size)
 
         state = np.zeros((64, len(CLASSES)), dtype=np.float32)
         from_square = None
         to_square = None
         board = chess.Board()
-        for i in range(len(sequence)):
+        for i in tqdm(range(len(sequence)), desc='Writing debug video'):
             update_state(state, sequence[i])
 
-            if i in logs:
-                d = logs[i]
+            if str(i) in logs:
+                d = logs[str(i)]
                 uci_move = board.parse_san(d['moves'].split()[0])
                 board.push(uci_move)
                 from_square = uci_move.from_square

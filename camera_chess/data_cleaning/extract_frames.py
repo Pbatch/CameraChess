@@ -4,23 +4,23 @@ import os
 
 import chess
 import chess.pgn
-import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import CORNERS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR, PIECE_TO_CLASS, DATA_DIR
+from camera_chess.constants import CORNERS, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR, PIECE_TO_CLASS, CLASSES
 from camera_chess.sequence_generator import SequenceGenerator
 from camera_chess.tracker import Tracker
-from camera_chess.utils import load_video_config, clear_dir
-from camera_chess.video import Video
+from camera_chess.utils import clear_dir
 
 
 def main(dataset):
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    video_config = load_video_config(dataset)
-    video = Video(video_config, target_fps=8)
+    sequence_generator = SequenceGenerator(dataset)
+    _, boxes = sequence_generator.create_sequence()
+
+    video = sequence_generator.video
     keypoints_template = {'original_width': video.width,
                           'original_height': video.height,
                           'from_name': 'kp-1',
@@ -35,18 +35,11 @@ def main(dataset):
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    sequence_path = os.path.join(DATA_DIR, dataset, 'sequence.npy')
-    boxes_path = os.path.join(DATA_DIR, dataset, 'boxes.npy')
-    logs_path = os.path.join(DATA_DIR, dataset, 'logs.json')
+    tracker = Tracker(dataset)
+    logs = tracker.process_sequence(sequence_generator.sequence_path)
 
-    sequence_generator = SequenceGenerator(dataset)
-    _, boxes = sequence_generator.create_sequence(sequence_path, boxes_path)
-
-    tracker = Tracker()
-    logs = tracker.process_sequence(sequence_path, logs_path)
-
-    board = chess.Board(fen=video_config.fen)
-    for i, (image, frame) in tqdm(enumerate(sequence_generator.video), desc='Frame', total=len(video)):
+    board = chess.Board(fen=sequence_generator.video_config.fen)
+    for i, (image, frame) in tqdm(enumerate(video), desc='Frame', total=len(video)):
         try:
             log = logs[str(i)]
         except KeyError:
@@ -70,15 +63,15 @@ def main(dataset):
                            'type': 'rectanglelabels'}
 
         dets = boxes[boxes[:, 0] == i]
-        _, idx = np.unique(dets[:, 1], return_index=True)
-        dets = dets[idx]
-
-        for square, l, t, r, b, conf in dets[:, 1:]:
+        for square, l, t, r, b, cls, conf in dets[:, 1:]:
             square = int(square)
-            piece = board.piece_at(square)
-            if piece is None or conf < 0.3:
-                continue
-            cls = PIECE_TO_CLASS[piece]
+            if square == -1:
+                cls = CLASSES[int(cls)]
+            else:
+                piece = board.piece_at(square)
+                if piece is None:
+                    continue
+                cls = PIECE_TO_CLASS[piece]
             label = labels_template.copy()
             label['value'] = {'x': 100 * l / video.width,
                               'y': 100 * t / video.height,

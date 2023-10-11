@@ -12,9 +12,9 @@ from camera_chess.constants import CLASSES, DATA_DIR, YOLO_DIR
 from camera_chess.utils import clear_dir
 
 DATASETS = {
-    'synthetic': ['chesscog',
-                  *[os.path.join('roboflow', s) for s in ['7', '10']]
-                  ],
+    # 'synthetic': ['chesscog',
+    #               *[os.path.join('roboflow', s) for s in ['7', '10']]
+    #               ],
     'val': ['google',
             os.path.join('peter', 'scholars_mate'),
             os.path.join('youtube', 'carlsen_vidit'),
@@ -33,6 +33,7 @@ DATASETS = {
               *[os.path.join('big_stand', s) for s in ['slav', 'berlin']],
               *[os.path.join('small_stand', s) for s in ['slav', 'berlin']],
               *[os.path.join('four_corners', s) for s in ['french', 'london', 'ponziani', 'tromp']],
+              *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'james', 'reti']],
               *[os.path.join('single_piece', s) for s in CLASSES],
               *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11',
                                                       'public', 'ppp']],
