@@ -133,7 +133,6 @@ def main(dataset, force):
     sequence_generator.create_sequence(force=force)
 
     tracker = Tracker(dataset)
-    force = True
     tracker.process_sequence(sequence_generator.sequence_path, force=force)
 
     sequence_generator.create_video(tracker.logs_path)

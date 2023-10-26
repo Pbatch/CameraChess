@@ -25,7 +25,8 @@ def create_scores(scores_path):
                                                        'carlsen_toma', 'duda_carlsen', 'gukesh_shakh', 'hans_rinat',
                                                        'hari_tuan', 'harika_nana', 'hikaru_sarin', 'hikaru_vasif',
                                                        'magnus_madaminov', 'ramirez_yoo', 'shimanov_vidit']],
-                *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'english', 'james', 'reti']],
+                *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'english', 'james', 'reti',
+                                                       'slav', 'ruy', 'vienna']],
                 *[os.path.join('four_corners', s) for s in ['caro', 'french', 'london', 'ponziani', 'tromp']]]
 
     scores = {}
@@ -89,14 +90,14 @@ def plot_scores(scores, plot_path):
 
 
 def main():
-    # timestamp = dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    # scores_path = os.path.join(DATA_DIR, f'{timestamp}_scores.json')
-    # plot_path = os.path.join(DATA_DIR, f'{timestamp}_plot.jpg')
-    # scores = create_scores(scores_path)
+    timestamp = dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    scores_path = os.path.join(DATA_DIR, f'{timestamp}_scores.json')
+    plot_path = os.path.join(DATA_DIR, f'{timestamp}_plot.jpg')
+    scores = create_scores(scores_path)
 
-    scores_path = os.path.join(DATA_DIR, "2023-10-09-16-29-57_scores.json")
-    plot_path = os.path.join(DATA_DIR, "2023-10-09-16-29-57_plot.jpg")
-    scores = load_scores(scores_path)
+    # scores_path = os.path.join(DATA_DIR, "2023-10-09-16-29-57_scores.json")
+    # plot_path = os.path.join(DATA_DIR, "2023-10-09-16-29-57_plot.jpg")
+    # scores = load_scores(scores_path)
 
     plot_scores(scores, plot_path)
 

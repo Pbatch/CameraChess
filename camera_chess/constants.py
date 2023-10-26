@@ -6,6 +6,7 @@ STUDIO_DIR = os.path.join(ROOT_DIR, 'label_studio')
 STUDIO_IMAGE_DIR = os.path.join(STUDIO_DIR, 'files', 'images')
 STUDIO_LABEL_DIR = os.path.join(STUDIO_DIR, 'files', 'labels')
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
+MODEL_DIR = os.path.join(ROOT_DIR, 'models')
 YOLO_DIR = os.path.join(DATA_DIR, 'yolo')
 KEYPOINTS_DIR = os.path.join(DATA_DIR, 'keypoints')
 

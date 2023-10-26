@@ -62,7 +62,8 @@ def load_yolo(pred_dir):
                 cls_idx = int(cls_idx)
 
                 label = CLASSES[cls_idx]
-                bounding_box = [xc - w / 2, yc - h / 2, w, h]
+                bounding_box = [xc - (w / 2), yc - (h / 2), w, h]
+
                 detection = fo.Detection(label=label,
                                          bounding_box=bounding_box,
                                          tags=[label])
