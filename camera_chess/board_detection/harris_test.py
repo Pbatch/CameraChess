@@ -14,23 +14,40 @@ from tqdm import tqdm
 from camera_chess.constants import YOLO_DIR, MODEL_DIR
 from camera_chess.export.wrapped_model import load_model
 
+GRID = np.concatenate(np.meshgrid(np.arange(7), np.arange(7))).reshape(2, -1).T.astype(np.float32)
+
+
+def calculate_offset_score(warped_xcorners, shift):
+    dist = cdist(warped_xcorners, GRID + shift)
+    row_idx, col_idx = linear_sum_assignment(dist)
+    score = 1 / (1 + dist[row_idx, col_idx].sum())
+    return score
+
 
 def find_offset(warped_xcorners):
-    best_score = 0
-    best_offset = None
-    grid = np.concatenate(np.meshgrid(np.arange(-6, 7), np.arange(-6, 7))).reshape(2, -1).T.astype(np.float32)
-    dist = cdist(warped_xcorners, grid)
+    best_offset = [0, 0]
+    for i in range(2):
+        low = -7
+        high = 1
+        scores = {}
+        while high - low > 1:
+            mid = (high + low) >> 1
+            if mid not in scores:
+                shift = [0, 0]
+                shift[i] = mid
+                scores[mid] = calculate_offset_score(warped_xcorners, shift)
+            if mid + 1 not in scores:
+                shift = [0, 0]
+                shift[i] = mid + 1
+                scores[mid + 1] = calculate_offset_score(warped_xcorners, shift)
+            if scores[mid] > scores[mid + 1]:
+                high = mid
+            else:
+                low = mid
+        best_offset[i] = low + 1
 
-    for i in range(7):
-        for j in range(7):
-            shift = 7 * i + 7 * j
-            print(49 + shift, dist.shape)
-            row_idx, col_idx = linear_sum_assignment(dist[:, shift:49 + shift])
-            score = 1 / dist[row_idx, col_idx + shift].sum()
-            if score > best_score:
-                best_score = score
-                best_offset = [i - 6, j - 6]
-    exit(1)
+    best_score = calculate_offset_score(warped_xcorners, best_offset)
+
     return best_offset, best_score
 
 
@@ -39,21 +56,23 @@ def apply_transform(src, transform):
                                     transform.astype(np.float32))[0].astype(np.float32)
 
 
-def refine_transform(xcorners, transform):
-    warped_xcorners = apply_transform(xcorners, transform)
-    refined_transform, _ = cv2.findHomography(xcorners, warped_xcorners, cv2.RANSAC)
-    if refined_transform is None:
-        refined_transform = transform
-    return refined_transform
-
-
 def score_quad(quad, xcorners):
+    # Initial transform
     ideal_quad = np.array([[0, 1], [1, 1], [1, 0], [0, 0]], dtype=np.float32)
     M = cv2.getPerspectiveTransform(quad.astype(np.float32), ideal_quad)
 
-    M_refined = refine_transform(xcorners, M)
-    warped_xcorners = apply_transform(xcorners, M_refined)
+    # First attempt
+    warped_xcorners = apply_transform(xcorners, M).round()
+    offset, _ = find_offset(warped_xcorners)
 
+    # Second attempt - remove outliers
+    warped_xcorners = apply_transform(xcorners, M).round() - offset
+    outliers = np.any((warped_xcorners < 0) | (warped_xcorners > 7), axis=1)
+    refined_M, _ = cv2.findHomography(xcorners[~outliers], warped_xcorners[~outliers], cv2.LMEDS)
+    if refined_M is not None:
+        M = refined_M
+
+    warped_xcorners = apply_transform(xcorners, M).round()
     offset, score = find_offset(warped_xcorners)
 
     return score, M, offset
@@ -90,20 +109,9 @@ def brutesac_chessboard(xcorners):
     best_offset = None
     for quad in xcorners[quads]:
         score, M, offset = score_quad(quad, xcorners)
-
-        warped_xcorners = apply_transform(xcorners, M).round() - offset
-
-        outliers = np.any((warped_xcorners < 0) | (warped_xcorners > 7), axis=1)
-        refined_M, _ = cv2.findHomography(xcorners[~outliers], warped_xcorners[~outliers], cv2.LMEDS)
-        if refined_M is None:
-            refined_M = M
-
-        warped_xcorners = apply_transform(xcorners, refined_M)
-        offset, score = find_offset(warped_xcorners)
-
         if score > best_score:
             best_score = score
-            best_M = refined_M
+            best_M = M
             best_quad = quad
             best_offset = offset
 
@@ -146,8 +154,7 @@ def elucidation(xcorners):
     corners = np.array([[-1, -1], [-1,  7], [7,  7], [7, -1], [-1, -1]]) + offset
     unwarped_corners = apply_transform(corners, inv_M)
 
-    grid = np.concatenate(np.meshgrid(np.arange(7), np.arange(7))).reshape(2, -1).T + offset
-    unwarped_grid = apply_transform(grid, inv_M)
+    unwarped_grid = apply_transform(GRID, inv_M)
 
     return unwarped_corners, unwarped_grid, quad, score, offset
 
@@ -187,7 +194,6 @@ def main():
         save_path = os.path.join('debug', os.path.basename(image_path))
         ic(save_path, score)
         cv2.imwrite(save_path, image)
-        exit(1)
 
 
 if __name__ == '__main__':
