@@ -20,14 +20,20 @@ class Video:
         self.end_frame = self.video_config.end * self.fps if self.video_config.end is not None else float('inf')
         self.mod = int(round(self.fps / self.target_fps))
 
-        self.roi = self._get_roi()
-        self.l, self.t, self.r, self.b = [int(i) for i in self.roi]
-        self.width = float(self.roi[2] - self.roi[0])
-        self.height = float(self.roi[3] - self.roi[1])
-        self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]], dtype=np.float32)
         self.frames = [i for i in range(len(self.vr))
                        if (self.start_frame <= i <= self.end_frame)
                        and i % self.mod == 0]
+
+        if self.video_config.keypoints is not None:
+            self.roi = self._get_roi()
+            self.l, self.t, self.r, self.b = [int(i) for i in self.roi]
+            self.width = float(self.roi[2] - self.roi[0])
+            self.height = float(self.roi[3] - self.roi[1])
+            self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]], dtype=np.float32)
+        else:
+            self.height, self.width = self.vr[0].asnumpy().shape[:2]
+            self.l, self.t, self.r, self.b = 0, 0, self.width, self.height
+            self.new_keypoints = None
 
     def _get_roi(self):
         height, width = self.vr[0].asnumpy().shape[:2]

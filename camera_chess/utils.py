@@ -8,6 +8,7 @@ import chess.pgn
 import cv2
 import numpy as np
 import yaml
+from PIL import ImageFont
 
 from camera_chess.constants import DATA_DIR, BOARD_SIZE
 
@@ -31,11 +32,17 @@ def load_video_config(dataset):
         d['fen'] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     if 'url' not in d:
         d['url'] = 'n/a'
+
+    if 'keypoints' in d:
+        keypoints = np.array(d['keypoints'], dtype=np.float32)
+    else:
+        keypoints = None
+
     video_config_ = video_config(start=d['start'],
                                  end=d['end'],
                                  url=d['url'],
                                  path=glob(os.path.join(dataset_dir, 'video.*'))[0],
-                                 keypoints=np.array(d['keypoints'], dtype=np.float32),
+                                 keypoints=keypoints,
                                  fen=d['fen'],
                                  moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')))
 
@@ -77,3 +84,33 @@ def deserialize(s):
 def update_state(state, update, decay=0.5):
     state *= decay
     state += (1 - decay) * update
+
+
+def draw_text(d, bbox, text):
+    font = ImageFont.load_default()
+    text_width, text_height = font.getsize(text)
+    y_offset = -10
+    x = (bbox[0] + bbox[2] - text_width) / 2
+    y = bbox[1] - y_offset
+
+    mid_x = (bbox[0] + bbox[2]) / 2
+    text_bbox = (mid_x - text_width / 2 - 5,
+                 bbox[1] - y_offset - text_height,
+                 mid_x + text_width / 2 + 5,
+                 bbox[1] - y_offset)
+    d.rectangle(text_bbox,
+                fill='black')
+    d.rectangle(tuple(bbox))
+    d.text((x, y - text_height), text=text)
+
+
+def draw_points(d, xy, colour, radius=5):
+    for x, y in xy:
+        bbox = [x - radius, y - radius,
+                x + radius, y + radius]
+        d.ellipse(bbox, fill=colour)
+
+
+def draw_lines(d, xy, colour, width=5):
+    for i in range(len(xy)):
+        d.line([*xy[i-1], *xy[i]], fill=colour, width=width)

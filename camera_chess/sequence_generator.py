@@ -12,10 +12,10 @@ from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
+from camera_chess.board_detection.board_detector import BoardDetector
 from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP, DATA_DIR
 from camera_chess.detector import Detector
-
-from camera_chess.utils import load_video_config, update_state
+from camera_chess.utils import load_video_config, update_state, draw_lines, draw_text
 from camera_chess.video import Video
 
 
@@ -27,7 +27,8 @@ class SequenceGenerator:
         self.video_config = load_video_config(self.dataset)
         self.video = Video(self.video_config, target_fps=8)
 
-        self.centers, self.boundary = self._get_centers_and_boundary(self.video.new_keypoints)
+        if self.video.new_keypoints is not None:
+            self.centers, self.boundary = self._get_centers_and_boundary(self.video.new_keypoints)
 
         cmap = plt.get_cmap('Blues')
         norm = colors.Normalize(vmin=0.0, vmax=1.0)
@@ -36,6 +37,7 @@ class SequenceGenerator:
         self.sequence_path = os.path.join(DATA_DIR, dataset, 'sequence.npy')
         self.boxes_path = os.path.join(DATA_DIR, dataset, 'boxes.npy')
         self.video_path = os.path.join(DATA_DIR, dataset, 'debug.mp4')
+        self.sequence_video_path = os.path.join(DATA_DIR, dataset, 'sequence_video.avi')
 
     @staticmethod
     def _perspective_transform(src, matrix):
@@ -143,16 +145,23 @@ class SequenceGenerator:
             boxes = np.load(self.boxes_path)
             return sequence, boxes
 
-        detector = Detector(model_path='models/480L.pt',
-                            device='cuda')
+        debug_video = cv2.VideoWriter(self.sequence_video_path, 0, 10, (int(self.video.width), int(self.video.height)))
+
+        detector = Detector(model_basename='480L.pt')
+        board_detector = BoardDetector()
         sequence = np.zeros((len(self.video), 64, len(CLASSES)))
         boxes = []
         for i, (image, frame) in tqdm(enumerate(self.video), desc='Creating sequence', total=len(self.video)):
+            corners = board_detector.find_corners(image)
             preds = detector.run(np.expand_dims(image, axis=0))[0]
+
             conf = np.max(preds[:, 4:], axis=1)
             conf_mask = conf > 0.1
             preds = preds[conf_mask]
             conf = conf[conf_mask]
+
+            keypoints = board_detector.match_corners(corners, preds)
+            self.centers, self.boundary = self._get_centers_and_boundary(list(keypoints.values()))
 
             box_centers = self._get_box_centers(preds)
             oob = self._get_oob(box_centers)
@@ -180,12 +189,27 @@ class SequenceGenerator:
 
             boxes.extend(frame_info)
 
+            pil_image = Image.fromarray(image)
+            d = ImageDraw.Draw(pil_image)
+            draw_lines(d, list(keypoints.values()), colour='red')
+            for text, (x, y) in keypoints.items():
+                bbox = [x - 5, y - 5, x + 5, y + 5]
+                draw_text(d, bbox, text)
+
+            for bbox, cls, conf in zip(frame_boxes, cls, max_conf):
+                text = f'{CLASSES[int(cls)]}:{conf[0]:.2f}'
+                draw_text(d, bbox, text=text)
+            debug_video.write(np.array(pil_image)[..., ::-1])
+
         sequence = np.asarray(sequence)
         np.save(self.sequence_path, sequence)
 
         boxes = np.asarray(boxes)
         boxes = boxes[(-boxes[:, -1]).argsort()]
         np.save(self.boxes_path, boxes)
+
+        cv2.destroyAllWindows()
+        debug_video.release()
 
         return sequence, boxes
 

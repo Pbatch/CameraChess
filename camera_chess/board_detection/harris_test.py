@@ -46,9 +46,7 @@ def find_offset(warped_xcorners):
                 low = mid
         best_offset[i] = low + 1
 
-    best_score = calculate_offset_score(warped_xcorners, best_offset)
-
-    return best_offset, best_score
+    return best_offset
 
 
 def apply_transform(src, transform):
@@ -63,7 +61,7 @@ def score_quad(quad, xcorners):
 
     # First attempt
     warped_xcorners = apply_transform(xcorners, M).round()
-    offset, _ = find_offset(warped_xcorners)
+    offset = find_offset(warped_xcorners)
 
     # Second attempt - remove outliers
     warped_xcorners = apply_transform(xcorners, M).round() - offset
@@ -72,8 +70,11 @@ def score_quad(quad, xcorners):
     if refined_M is not None:
         M = refined_M
 
-    warped_xcorners = apply_transform(xcorners, M).round()
-    offset, score = find_offset(warped_xcorners)
+    # Score final matrix
+    # Do not round the warped xcorners
+    warped_xcorners = apply_transform(xcorners, M)
+    offset = find_offset(warped_xcorners)
+    score = calculate_offset_score(warped_xcorners, offset)
 
     return score, M, offset
 
