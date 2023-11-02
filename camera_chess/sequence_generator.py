@@ -13,9 +13,9 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from camera_chess.board_detection.board_detector import BoardDetector
-from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP, DATA_DIR
+from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP, DATA_DIR, CORNERS
 from camera_chess.detector import Detector
-from camera_chess.utils import load_video_config, update_state, draw_lines, draw_text
+from camera_chess.utils import load_video_config, update_state, draw_lines, draw_text, warp
 from camera_chess.video import Video
 
 
@@ -139,7 +139,7 @@ class SequenceGenerator:
                        fill='black')
         return image
 
-    def create_sequence(self, force=False):
+    def create_sequence(self, force=False, infer_keypoints=False):
         if os.path.isfile(self.sequence_path) and os.path.isfile(self.boxes_path) and not force:
             sequence = np.load(self.sequence_path)
             boxes = np.load(self.boxes_path)
@@ -151,8 +151,17 @@ class SequenceGenerator:
         board_detector = BoardDetector()
         sequence = np.zeros((len(self.video), 64, len(CLASSES)))
         boxes = []
+
+        if not infer_keypoints and self.video.new_keypoints is None:
+            print(f'No keypoints for {self.dataset}. Switching to infer mode.')
+            infer_keypoints = True
+
+        if infer_keypoints:
+            keypoints = None
+        else:
+            keypoints = {k: v for k, v in zip(CORNERS, self.video.new_keypoints)}
+
         for i, (image, frame) in tqdm(enumerate(self.video), desc='Creating sequence', total=len(self.video)):
-            corners = board_detector.find_corners(image)
             preds = detector.run(np.expand_dims(image, axis=0))[0]
 
             conf = np.max(preds[:, 4:], axis=1)
@@ -160,8 +169,16 @@ class SequenceGenerator:
             preds = preds[conf_mask]
             conf = conf[conf_mask]
 
-            keypoints = board_detector.match_corners(corners, preds)
-            self.centers, self.boundary = self._get_centers_and_boundary(list(keypoints.values()))
+            if infer_keypoints:
+                corners = board_detector.find_corners(image)
+                if corners is None:
+                    tqdm.write(f'Bad frame {frame}')
+                    continue
+                if keypoints is None:
+                    keypoints = board_detector.match_corners_using_preds(corners, preds)
+                else:
+                    keypoints = board_detector.match_corners_using_keypoints(corners, keypoints)
+                self.centers, self.boundary = self._get_centers_and_boundary([keypoints[k] for k in CORNERS])
 
             box_centers = self._get_box_centers(preds)
             oob = self._get_oob(box_centers)
@@ -229,7 +246,7 @@ class SequenceGenerator:
         state = np.zeros((64, len(CLASSES)), dtype=np.float32)
         from_square = None
         to_square = None
-        board = chess.Board()
+        board = chess.Board(self.video_config.fen)
         for i in tqdm(range(len(sequence)), desc='Writing debug video'):
             update_state(state, sequence[i])
 

@@ -9,7 +9,7 @@ from tqdm import tqdm
 from camera_chess.constants import CLASSES, DATA_DIR
 from camera_chess.move_data_generator import MoveDataGenerator
 from camera_chess.sequence_generator import SequenceGenerator
-from camera_chess.utils import update_state
+from camera_chess.utils import update_state, load_video_config
 
 
 class Tracker:
@@ -74,8 +74,9 @@ class Tracker:
                 best_joint_score = joint_score
                 best_moves = d["moves"]
             elif joint_score == best_joint_score:
-                print(d)
-                raise ValueError("Find a way to differentiate this move!")
+                print("Error! Two moves have the same joint score")
+                print(f"Candidate ({joint_score:.2f})", d["moves"])
+                print(f"Best moves ({best_joint_score:.2f}) ", best_moves)
 
         return best_score_1, best_score_2, best_joint_score, best_move, best_moves, possible_moves
 
@@ -88,8 +89,9 @@ class Tracker:
         sequence = np.load(sequence_path)
 
         logs = {}
+        video_config = load_video_config(self.dataset)
         state = np.zeros((64, len(CLASSES)), dtype=np.float32)
-        board = chess.Board()
+        board = chess.Board(video_config.fen)
         pgn = ''
         move_data_generator = MoveDataGenerator()
         move_data = move_data_generator.run(board)
@@ -110,7 +112,6 @@ class Tracker:
                                           logs=logs,
                                           key=i)
                 move_data = move_data_generator.run(board)
-                print(possible_moves)
                 possible_moves.clear()
 
             if best_score_1 > 0 and not push_move and i == len(sequence) - 1:

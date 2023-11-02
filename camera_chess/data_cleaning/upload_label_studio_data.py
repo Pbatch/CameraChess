@@ -2,13 +2,12 @@ import argparse
 import json
 import os
 import shutil
+from glob import glob
 
 from imagesize import imagesize
 from tqdm import tqdm
 
-from camera_chess.constants import CLASSES, DATA_DIR, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR
-from glob import glob
-
+from camera_chess.constants import DATA_DIR, STUDIO_IMAGE_DIR, STUDIO_LABEL_DIR
 from camera_chess.utils import clear_dir
 
 

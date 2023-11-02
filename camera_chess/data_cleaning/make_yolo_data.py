@@ -21,6 +21,7 @@ DATASETS = {
             os.path.join('four_corners', 'caro'),
             os.path.join('mercato', 'english')],
     'train': ['google_empty',
+              'chessred2k',
               *[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
                                                      'harika_nana', 'anand_carlsen', 'gukesh_shakh',
                                                      'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',

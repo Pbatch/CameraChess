@@ -12,7 +12,7 @@ from PIL import ImageFont
 
 from camera_chess.constants import DATA_DIR, BOARD_SIZE
 
-video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves")
+video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves roi")
 
 
 def get_square(idx):
@@ -38,13 +38,16 @@ def load_video_config(dataset):
     else:
         keypoints = None
 
+    roi = d.get('roi', None)
+
     video_config_ = video_config(start=d['start'],
                                  end=d['end'],
                                  url=d['url'],
                                  path=glob(os.path.join(dataset_dir, 'video.*'))[0],
                                  keypoints=keypoints,
                                  fen=d['fen'],
-                                 moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')))
+                                 moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')),
+                                 roi=roi)
 
     return video_config_
 

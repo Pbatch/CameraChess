@@ -6,13 +6,11 @@ import time
 from PIL import Image
 
 from camera_chess.constants import DATA_DIR
-from camera_chess.visualizer import Visualizer
 from tqdm import tqdm
 
 
 def main(dataset, export_id):
     verbose = False
-    visualizer = Visualizer()
     with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:
         labels = json.load(f)
 
@@ -48,7 +46,6 @@ def main(dataset, export_id):
         image.save(new_image_path)
 
         if verbose:
-            image = Visualizer.add_bboxes(image, new_label['bboxes'])
             image.show()
             time.sleep(1)
 

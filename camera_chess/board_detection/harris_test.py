@@ -161,7 +161,7 @@ def elucidation(xcorners):
 
 
 def main():
-    model = load_model(model_path=os.path.join(MODEL_DIR, "480L_keypoints.pt"), device='cuda:0')
+    model = load_model(model_path=os.path.join(MODEL_DIR, "480L_xcorner.pt"), device='cuda:0')
     label_paths = list(glob(os.path.join(YOLO_DIR, 'val', 'labels', '*')))
     # label_paths = [os.path.join(YOLO_DIR, 'val', 'labels', 'google_5.jpg')]
 

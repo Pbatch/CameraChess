@@ -30,6 +30,11 @@ class Video:
             self.width = float(self.roi[2] - self.roi[0])
             self.height = float(self.roi[3] - self.roi[1])
             self.new_keypoints = self.video_config.keypoints - np.array([self.roi[0], self.roi[1]], dtype=np.float32)
+        elif self.video_config.roi is not None:
+            self.l, self.t, self.r, self.b = [int(i) for i in video_config.roi]
+            self.width = float(self.r - self.l)
+            self.height = float(self.b - self.t)
+            self.new_keypoints = None
         else:
             self.height, self.width = self.vr[0].asnumpy().shape[:2]
             self.l, self.t, self.r, self.b = 0, 0, self.width, self.height

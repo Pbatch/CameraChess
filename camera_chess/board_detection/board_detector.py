@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import torch
 import torchvision
+from icecream import ic
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import Delaunay
 from scipy.spatial.distance import cdist
@@ -17,7 +18,7 @@ from camera_chess.export.wrapped_model import load_model
 class BoardDetector:
     GRID = np.concatenate(np.meshgrid(np.arange(7), np.arange(7))).reshape(2, -1).T.astype(np.float32)
 
-    def __init__(self, model_basename="480L_keypoints.pt", device='cuda:0', iou_thresh=0.1, conf_thresh=0.3):
+    def __init__(self, model_basename="480L_xcorner.pt", device='cuda:0', iou_thresh=0.1, conf_thresh=0.3):
         self.model_basename = model_basename
         self.device = device
         self.iou_thresh = iou_thresh
@@ -95,9 +96,10 @@ class BoardDetector:
         # Second attempt - remove outliers
         warped_xcorners = self._apply_transform(xcorners, M).round() - offset
         outliers = np.any((warped_xcorners < 0) | (warped_xcorners > 7), axis=1)
-        refined_M, _ = cv2.findHomography(xcorners[~outliers], warped_xcorners[~outliers], cv2.LMEDS)
-        if refined_M is not None:
-            M = refined_M
+        if len(xcorners[~outliers]) >= 4:
+            refined_M, _ = cv2.findHomography(xcorners[~outliers], warped_xcorners[~outliers], cv2.LMEDS)
+            if refined_M is not None:
+                M = refined_M
 
         # Score final matrix
         # Do not round the warped xcorners
@@ -139,13 +141,21 @@ class BoardDetector:
         scores = scores[mask]
 
         keep = torchvision.ops.nms(boxes, scores, iou_threshold=self.iou_thresh)
-        boxes = boxes[keep].detach().cpu().numpy().astype(int)
+        boxes = boxes[keep].detach().cpu().numpy()
+        height, width = image.shape[:2]
+        boxes[:, 0] = np.clip(boxes[:, 0], a_min=0, a_max=boxes[:, 2])
+        boxes[:, 1] = np.clip(boxes[:, 1], a_min=0, a_max=boxes[:, 3])
+        boxes[:, 2] = np.clip(boxes[:, 2], a_min=boxes[:, 0], a_max=width)
+        boxes[:, 3] = np.clip(boxes[:, 3], a_min=boxes[:, 1], a_max=height)
+        boxes = boxes.astype(int)
 
         xcorners = []
-        for l, t, r, b in boxes:
-            region = dst[t:b, l:r]
+        for left, top, right, bottom in boxes:
+            if right - left == 0 or bottom - top == 0:
+                continue
+            region = dst[top:bottom, left:right]
             dx, dy = np.unravel_index(region.argmax(), region.shape)
-            xcorner = [l + dx, t + dy]
+            xcorner = [left + dx, top + dy]
             xcorners.append(xcorner)
         xcorners = np.array(xcorners, dtype=np.float32)
 
@@ -167,35 +177,38 @@ class BoardDetector:
             corners = self._create_corners(M, offset)
         return corners
 
-    def match_corners(self, corners, data, mode='pred'):
-        if mode == 'pred':
-            cx = (data[:, 0] + data[:, 2]) / 2
-            cy = data[:, 3] - ((data[:, 2] - data[:, 0]) / 3)
-            box_centers = np.vstack((cx, cy)).T
+    def match_corners_using_preds(self, corners, preds):
+        cx = (preds[:, 0] + preds[:, 2]) / 2
+        cy = preds[:, 3] - ((preds[:, 2] - preds[:, 0]) / 3)
+        box_centers = np.vstack((cx, cy)).T
 
-            dist = cdist(corners, box_centers)
-            black_conf = np.max(data[:, 4:10], axis=1)
-            white_conf = np.max(data[:, 10:], axis=1)
+        dist = cdist(corners, box_centers)
+        black_conf = np.max(preds[:, 4:10], axis=1)
+        white_conf = np.max(preds[:, 10:], axis=1)
 
-            white_scores = np.dot(1/dist, white_conf)
-            black_scores = np.dot(1/dist, black_conf)
-            scores = white_scores - black_scores
+        white_scores = np.dot(1/dist, white_conf)
+        black_scores = np.dot(1/dist, black_conf)
+        scores = white_scores - black_scores
 
-            best_i = None
-            best_score = -float('inf')
-            for i in range(4):
-                rolled_scores = np.roll(scores, i)
-                score = rolled_scores[0] + rolled_scores[1] - rolled_scores[2] - rolled_scores[3]
-                if score > best_score:
-                    best_score = score
-                    best_i = i
+        best_i = None
+        best_score = -float('inf')
+        for i in range(4):
+            rolled_scores = np.roll(scores, i)
+            score = rolled_scores[0] + rolled_scores[1] - rolled_scores[2] - rolled_scores[3]
+            if score > best_score:
+                best_score = score
+                best_i = i
 
-            keypoints = {k: corners[v].tolist() for k, v in zip(CORNERS, np.roll([0, 1, 2, 3], best_i))}
+        keypoints = {k: corners[v].tolist() for k, v in zip(CORNERS, np.roll([0, 1, 2, 3], best_i))}
 
-        elif mode == 'keypoints':
-            raise ValueError('Not supported yet')
-        else:
-            raise ValueError(f'Mode must be "pred" or "keypoints"')
+        return keypoints
+
+    def match_corners_using_keypoints(self, corners, keypoints):
+        dist = cdist(corners, list(keypoints.values()))
+        row_idx, col_idx = linear_sum_assignment(dist)
+
+        keys = list(keypoints.keys())
+        keypoints = {keys[j]: corners[i].tolist() for i, j in zip(row_idx, col_idx)}
 
         return keypoints
 

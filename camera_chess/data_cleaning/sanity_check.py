@@ -36,7 +36,7 @@ def main():
         basename = os.path.basename(label_path)
         *root_dataset, id_ = basename.split('_')
         root_dataset = '_'.join(root_dataset)
-        id_ = id_.replace('.txt', '')
+        id_ = int(id_.replace('.txt', '')) + 1
 
         classes = []
         bboxes = []
