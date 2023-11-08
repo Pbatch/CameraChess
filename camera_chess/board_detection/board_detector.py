@@ -5,8 +5,6 @@ import cv2
 import numpy as np
 import torch
 import torchvision
-from icecream import ic
-from scipy.optimize import linear_sum_assignment
 from scipy.spatial import Delaunay
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
@@ -29,8 +27,11 @@ class BoardDetector:
 
     @staticmethod
     def _apply_transform(src, transform):
-        return cv2.perspectiveTransform(np.expand_dims(src, 0).astype(np.float32),
-                                        transform.astype(np.float32))[0].astype(np.float32)
+        src_3d = np.concatenate([src, np.ones([len(src), 1])], axis=1)
+        warped_src = src_3d @ transform.T
+        warped_src /= warped_src[:, 2][:, None] + 1e-8
+        warped_src = warped_src[:, :2]
+        return warped_src
 
     @staticmethod
     def _run_delaunay(xcorners):
@@ -55,9 +56,9 @@ class BoardDetector:
         return np.array(quads)
 
     def _calculate_offset_score(self, warped_xcorners, shift):
-        dist = cdist(warped_xcorners, self.GRID + shift)
-        row_idx, col_idx = linear_sum_assignment(dist)
-        score = 1 / (1 + dist[row_idx, col_idx].sum())
+        dist = cdist(self.GRID + shift, warped_xcorners)
+        cost = np.sum(np.min(dist, axis=1))
+        score = 1 / (1 + cost)
         return score
 
     def _find_offset(self, warped_xcorners):
