@@ -4,6 +4,7 @@ import os
 from glob import glob
 
 import fiftyone as fo
+import numpy as np
 import torch
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from tqdm import tqdm
@@ -43,7 +44,7 @@ def load_label_studio():
 
 def load_yolo(pred_dir):
     samples = []
-    for split in ['train', 'val']:
+    for split in ['train']:
         paths = glob(os.path.join(DATA_DIR, 'yolo', split, 'labels', '*.txt'))
         for label_path in tqdm(sorted(paths)):
             image_path = label_path.replace('labels', 'images', 1).replace('.txt', '.jpg')
@@ -74,7 +75,7 @@ def load_yolo(pred_dir):
             sample['groundtruth'] = fo.Detections(detections=detections)
 
             if pred_dir is None:
-                sample['ap'] = 1.0
+                sample['map'] = 1.0
                 samples.append(sample)
                 continue
 
@@ -112,18 +113,18 @@ def load_yolo(pred_dir):
                            labels=torch.tensor(gt_labels))]
             metric.update(preds, target)
             result = metric.compute()
-            ap = result['map'].item()
+            ap = result['map_50'].item()
             if ap != -1.0:
-                sample['ap'] = ap
+                sample['map'] = ap
             else:
-                sample['ap'] = 1.0
+                sample['map'] = 1.0
 
             samples.append(sample)
 
     dataset = fo.Dataset()
     dataset.add_samples(samples)
     if pred_dir is not None:
-        dataset = dataset.sort_by('ap')
+        dataset = dataset.sort_by('map')
     dataset.save()
 
     return dataset

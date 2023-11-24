@@ -67,7 +67,7 @@ def main():
             bad_labels[root_dataset][id_].append(['bad_pieces', bad_count])
 
         for bbox in bboxes.numpy():
-            if bbox[2] < 0.05 or bbox[3] < 0.05:
+            if bbox[2] < 0.01 or bbox[3] < 0.01:
                 bad_labels[root_dataset][id_].append(['small_bbox', bbox.tolist()])
 
     for root_dataset, d in bad_labels.items():

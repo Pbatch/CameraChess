@@ -6,23 +6,10 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import CORNERS, DATA_DIR
+from camera_chess.constants import CORNERS, DATA_DIR, CHAR_TO_CATEGORY
 
 
 def main():
-    cog_map = {'k': 'black-king',
-               'q': 'black-queen',
-               'r': 'black-rook',
-               'p': 'black-pawn',
-               'b': 'black-bishop',
-               'n': 'black-knight',
-               'K': 'white-king',
-               'Q': 'white-queen',
-               'R': 'white-rook',
-               'P': 'white-pawn',
-               'B': 'white-bishop',
-               'N': 'white-knight'}
-
     for i, old_label_path in tqdm(enumerate(sorted(glob('data/chesscog/raw/*/*.json')))):
         old_image_path = old_label_path.replace('.json', '.png')
 
@@ -39,7 +26,7 @@ def main():
 
         bboxes = []
         for piece in d['pieces']:
-            label = cog_map[piece['piece']]
+            label = CHAR_TO_CATEGORY[piece['piece']]
             bbox = piece['box']
             x = bbox[0] / image.width
             y = bbox[1] / image.height

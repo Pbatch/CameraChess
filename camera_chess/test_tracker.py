@@ -1,3 +1,4 @@
+import argparse
 import io
 import json
 import os
@@ -20,21 +21,23 @@ def load_scores(scores_path):
     return scores
 
 
-def create_scores(scores_path):
+def create_scores(scores_path, force):
     datasets = [*[os.path.join('youtube', s) for s in ['carlsen_vidit', 'anand_carlsen', 'dubov_nepo', 'carlsen_abdu',
                                                        'carlsen_toma', 'duda_carlsen', 'gukesh_shakh', 'hans_rinat',
                                                        'hari_tuan', 'harika_nana', 'hikaru_sarin', 'hikaru_vasif',
-                                                       'magnus_madaminov', 'ramirez_yoo', 'shimanov_vidit']],
+                                                       'magnus_madaminov', 'ramirez_yoo', 'shimanov_vidit', 'cramling_ukraine',
+                                                       'cramling_boris']],
                 *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'english', 'james', 'reti',
                                                        'slav', 'ruy', 'vienna']],
-                *[os.path.join('four_corners', s) for s in ['caro', 'french', 'london', 'ponziani', 'tromp']]]
+                *[os.path.join('four_corners', s) for s in ['caro', 'french', 'london', 'ponziani', 'tromp']],
+                *[os.path.join('tom', s) for s in ['slav', 'spanish', 'italian']]]
 
     scores = {}
     for dataset in datasets:
         tracker = Tracker(dataset)
         sequence_generator = SequenceGenerator(dataset)
-        sequence_generator.create_sequence()
-        logs = tracker.process_sequence(sequence_generator.sequence_path)
+        sequence_generator.create_sequence(force=force)
+        logs = tracker.process_sequence(sequence_generator.sequence_path, force=force)
 
         pred_pgn = logs[max(logs.keys(), key=lambda x: int(x))]['pgn']
         pred_moves = [str(move) for move in chess.pgn.read_game(io.StringIO(pred_pgn)).mainline_moves()]
@@ -89,11 +92,11 @@ def plot_scores(scores, plot_path):
     plt.savefig(plot_path)
 
 
-def main():
+def main(force):
     timestamp = dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     scores_path = os.path.join(DATA_DIR, f'{timestamp}_scores.json')
     plot_path = os.path.join(DATA_DIR, f'{timestamp}_plot.jpg')
-    scores = create_scores(scores_path)
+    scores = create_scores(scores_path, force)
 
     # scores_path = os.path.join(DATA_DIR, "2023-10-09-16-29-57_scores.json")
     # plot_path = os.path.join(DATA_DIR, "2023-10-09-16-29-57_plot.jpg")
@@ -103,4 +106,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', '-f', action="store_true")
+    args = parser.parse_args()
+    main(args.force)

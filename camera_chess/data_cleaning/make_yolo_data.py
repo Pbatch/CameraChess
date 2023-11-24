@@ -11,17 +11,19 @@ from tqdm import tqdm
 from camera_chess.constants import CLASSES, DATA_DIR, YOLO_DIR
 from camera_chess.utils import clear_dir
 
+# Could add chessvision/train to synthetic data (200k images...)
 DATASETS = {
-    # 'synthetic': ['chesscog',
-    #               *[os.path.join('roboflow', s) for s in ['7', '10']]
-    #               ],
+    'synthetic': ['chesscog',
+                  'chessred2k',
+                  *[os.path.join('chessvision', s) for s in ['test']],
+                  *[os.path.join('roboflow', s) for s in ['7', '10']]
+                  ],
     'val': ['google',
             os.path.join('peter', 'scholars_mate'),
             os.path.join('youtube', 'carlsen_vidit'),
             os.path.join('four_corners', 'caro'),
             os.path.join('mercato', 'english')],
     'train': ['google_empty',
-              'chessred2k',
               *[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
                                                      'harika_nana', 'anand_carlsen', 'gukesh_shakh',
                                                      'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',
@@ -40,7 +42,8 @@ DATASETS = {
               *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11',
                                                       'public', 'ppp']],
               *[os.path.join('peter_wooden', s) for s in ['scholars_mate', 'smothered_mate', 'gerasimov_smyslov',
-                                                          'wells_shirov']]
+                                                          'wells_shirov']],
+              *[os.path.join('tom', s) for s in ['slav', 'italian', 'spanish']]
               ]
 }
 
