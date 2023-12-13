@@ -5,6 +5,7 @@ import torch
 
 from camera_chess.constants import MODEL_DIR
 from camera_chess.export.wrapped_model import load_model
+from camera_chess.export.wrapped_yolonas_model import load_yolonas_model
 
 Detections = namedtuple("Detections", "xyxy conf cls")
 
@@ -14,8 +15,11 @@ class Detector:
         self.model_basename = model_basename
         self.device = device
 
-        self.model = load_model(model_path=os.path.join(MODEL_DIR, self.model_basename),
-                                device=self.device)
+        if 'yolonas' in self.model_basename:
+            self.model = load_yolonas_model(model_path=os.path.join(MODEL_DIR, self.model_basename))
+        else:
+            self.model = load_model(model_path=os.path.join(MODEL_DIR, self.model_basename),
+                                    device=self.device)
 
     def run(self, images):
         images = torch.tensor(images, device=self.device)

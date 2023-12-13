@@ -15,15 +15,17 @@ from tqdm import tqdm
 from camera_chess.board_detection.board_detector import BoardDetector
 from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP, DATA_DIR, CORNERS
 from camera_chess.detector import Detector
-from camera_chess.utils import load_video_config, update_state, draw_lines, draw_text, warp
+from camera_chess.utils import load_video_config, update_state, draw_lines, draw_text
 from camera_chess.video import Video
 
 
 class SequenceGenerator:
     PLOT_SIZE = 64
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, model_basename):
         self.dataset = dataset
+        self.model_basename = model_basename
+
         self.video_config = load_video_config(self.dataset)
         self.video = Video(self.video_config, target_fps=8)
 
@@ -34,10 +36,12 @@ class SequenceGenerator:
         norm = colors.Normalize(vmin=0.0, vmax=1.0)
         self.scalar_map = cmx.ScalarMappable(norm=norm, cmap=cmap)
 
-        self.sequence_path = os.path.join(DATA_DIR, dataset, 'sequence.npy')
-        self.boxes_path = os.path.join(DATA_DIR, dataset, 'boxes.npy')
-        self.video_path = os.path.join(DATA_DIR, dataset, 'debug.mp4')
-        self.sequence_video_path = os.path.join(DATA_DIR, dataset, 'sequence_video.avi')
+        save_dir = os.path.join(DATA_DIR, dataset, model_basename.split('.')[0])
+        os.makedirs(save_dir, exist_ok=True)
+        self.sequence_path = os.path.join(save_dir, 'sequence.npy')
+        self.boxes_path = os.path.join(save_dir, 'boxes.npy')
+        self.video_path = os.path.join(save_dir, 'debug.mp4')
+        self.sequence_video_path = os.path.join(save_dir, 'sequence_video.avi')
 
     @staticmethod
     def _perspective_transform(src, matrix):
@@ -139,15 +143,16 @@ class SequenceGenerator:
                        fill='black')
         return image
 
-    def create_sequence(self, force=False, infer_keypoints=False):
+    def create_sequence(self, debug=False, force=False, infer_keypoints=False):
         if os.path.isfile(self.sequence_path) and os.path.isfile(self.boxes_path) and not force:
             sequence = np.load(self.sequence_path)
             boxes = np.load(self.boxes_path)
             return sequence, boxes
 
-        debug_video = cv2.VideoWriter(self.sequence_video_path, 0, 10, (int(self.video.width), int(self.video.height)))
+        if debug:
+            debug_video = cv2.VideoWriter(self.sequence_video_path, 0, 10, (int(self.video.width), int(self.video.height)))
 
-        detector = Detector(model_basename='480L.pt')
+        detector = Detector(model_basename=self.model_basename)
         board_detector = BoardDetector()
         sequence = np.zeros((len(self.video), 64, len(CLASSES)))
         boxes = []
@@ -206,17 +211,19 @@ class SequenceGenerator:
 
             boxes.extend(frame_info)
 
-            pil_image = Image.fromarray(image)
-            d = ImageDraw.Draw(pil_image)
-            draw_lines(d, list(keypoints.values()), colour='red')
-            for text, (x, y) in keypoints.items():
-                bbox = [x - 5, y - 5, x + 5, y + 5]
-                draw_text(d, bbox, text)
+            if debug:
+                pil_image = Image.fromarray(image)
+                d = ImageDraw.Draw(pil_image)
+                draw_lines(d, list(keypoints.values()), colour='red')
+                for text, (x, y) in keypoints.items():
+                    bbox = [x - 5, y - 5, x + 5, y + 5]
+                    draw_text(d, bbox, text)
 
-            for bbox, cls, conf in zip(frame_boxes, cls, max_conf):
-                text = f'{CLASSES[int(cls)]}:{conf[0]:.2f}'
-                draw_text(d, bbox, text=text)
-            debug_video.write(np.array(pil_image)[..., ::-1])
+                for bbox, cls, conf in zip(frame_boxes, cls, max_conf):
+                    text = f'{CLASSES[int(cls)]}:{conf[0]:.2f}'
+                    draw_text(d, bbox, text=text)
+
+                debug_video.write(np.array(pil_image)[..., ::-1])
 
         sequence = np.asarray(sequence)
         np.save(self.sequence_path, sequence)
@@ -226,7 +233,8 @@ class SequenceGenerator:
         np.save(self.boxes_path, boxes)
 
         cv2.destroyAllWindows()
-        debug_video.release()
+        if debug:
+            debug_video.release()
 
         return sequence, boxes
 

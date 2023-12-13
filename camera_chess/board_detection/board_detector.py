@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import torch
 import torchvision
+from scipy.optimize import linear_sum_assignment
 from scipy.spatial import Delaunay
 from scipy.spatial.distance import cdist
 from tqdm import tqdm

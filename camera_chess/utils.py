@@ -91,7 +91,7 @@ def update_state(state, update, decay=0.5):
 
 def draw_text(d, bbox, text):
     font = ImageFont.load_default()
-    text_width, text_height = font.getsize(text)
+    _, _, text_width, text_height = font.getbbox(text)
     y_offset = -10
     x = (bbox[0] + bbox[2] - text_width) / 2
     y = bbox[1] - y_offset

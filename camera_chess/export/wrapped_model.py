@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional as F
-import torchvision
 from torch import nn
 from ultralytics.nn.modules import Detect, C2f
 
@@ -9,11 +8,14 @@ class WrappedModel(nn.Module):
     max_wh = 7680
     max_classes = 12
 
-    def __init__(self, model, image_size=480, fill_colour=114):
+    def __init__(self, model, model_width=640, model_height=384, fill_colour=114):
         super().__init__()
         self.model = model
-        self.image_size = image_size
+        self.model_width = model_width
+        self.model_height = model_height
         self.fill_colour = fill_colour
+
+        self.desired_ratio = self.model_height / self.model_width
 
     def _preprocess(self, x):
         # Change type (uint8 -> float32)
@@ -24,12 +26,12 @@ class WrappedModel(nn.Module):
         x = torch.permute(x, (0, 3, 1, 2))
         height, width = x.shape[2:]
         ratio = height / width
-        if ratio > 1:
-            height = self.image_size
-            width = self.image_size / ratio
+        if ratio > self.desired_ratio:
+            height = self.model_height
+            width = self.model_height / self.desired_ratio
         else:
-            width = self.image_size
-            height = self.image_size * ratio
+            width = self.model_width
+            height = self.model_width * self.desired_ratio
 
         x = F.interpolate(x,
                           size=(int(height), int(width)),
@@ -40,8 +42,8 @@ class WrappedModel(nn.Module):
         # Padding
         # (N, C, H*, W*) -> (N, C, image_size, image_size)
         height, width = x.shape[2:]
-        dh = (self.image_size - height) / 2
-        dw = (self.image_size - width) / 2
+        dh = (self.model_height - height) / 2
+        dw = (self.model_width - width) / 2
         padding = torch.tensor([dw - 0.1, dw + 0.1, dh - 0.1, dh + 0.1]).round().to(dtype=torch.int32).tolist()
         x = F.pad(x, padding, value=self.fill_colour)
 
@@ -60,8 +62,8 @@ class WrappedModel(nn.Module):
         # Unpad then unscale
         y[..., [0, 2]] -= padding[0]
         y[..., [1, 3]] -= padding[2]
-        y[..., [0, 2]] *= width / (self.image_size - padding[0] - padding[1])
-        y[..., [1, 3]] *= height / (self.image_size - padding[2] - padding[3])
+        y[..., [0, 2]] *= width / (self.model_width - padding[0] - padding[1])
+        y[..., [1, 3]] *= height / (self.model_height - padding[2] - padding[3])
 
         return y
 

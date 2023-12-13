@@ -13,14 +13,15 @@ from camera_chess.utils import update_state, load_video_config
 
 
 class Tracker:
-    def __init__(self, dataset, from_thr=0.6, to_thr=0.6, possible_thr=0.0, decay=0.5):
+    def __init__(self, dataset, model_basename, from_thr=0.6, to_thr=0.6, possible_thr=0.0, decay=0.5):
         self.dataset = dataset
+        self.model_basename = model_basename
         self.from_thr = from_thr
         self.to_thr = to_thr
         self.possible_thr = possible_thr
         self.decay = decay
 
-        self.logs_path = os.path.join(DATA_DIR, self.dataset, 'logs.json')
+        self.logs_path = os.path.join(DATA_DIR, self.dataset, self.model_basename.split('.')[0], 'logs.json')
 
     @staticmethod
     def _update(board, san_move, san_moves, pgn, score, logs, key):
@@ -129,11 +130,11 @@ class Tracker:
         return logs
 
 
-def main(dataset, force):
-    sequence_generator = SequenceGenerator(dataset)
-    sequence_generator.create_sequence(force=force)
+def main(dataset, model_basename, force):
+    sequence_generator = SequenceGenerator(dataset, model_basename)
+    sequence_generator.create_sequence(force=force, debug=True)
 
-    tracker = Tracker(dataset)
+    tracker = Tracker(dataset, model_basename=sequence_generator.model_basename)
     tracker.process_sequence(sequence_generator.sequence_path, force=force)
 
     sequence_generator.create_video(tracker.logs_path)
@@ -142,6 +143,7 @@ def main(dataset, force):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', '-d', type=str, required=True)
+    parser.add_argument('--model_basename', '-m', type=str, default="480N.pt")
     parser.add_argument('--force', '-f', action="store_true")
     args = parser.parse_args()
-    main(args.dataset, args.force)
+    main(args.dataset, args.model_basename, args.force)
