@@ -4,7 +4,6 @@ import os
 from glob import glob
 
 import fiftyone as fo
-import numpy as np
 import torch
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from tqdm import tqdm

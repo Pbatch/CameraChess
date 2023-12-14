@@ -29,8 +29,8 @@ class SequenceGenerator:
         self.video_config = load_video_config(self.dataset)
         self.video = Video(self.video_config, target_fps=8)
 
-        if self.video.new_keypoints is not None:
-            self.centers, self.boundary = self._get_centers_and_boundary(self.video.new_keypoints)
+        if self.video_config.keypoints is not None:
+            self.centers, self.boundary = self._get_centers_and_boundary(self.video_config.keypoints)
 
         cmap = plt.get_cmap('Blues')
         norm = colors.Normalize(vmin=0.0, vmax=1.0)
@@ -150,24 +150,24 @@ class SequenceGenerator:
             return sequence, boxes
 
         if debug:
-            debug_video = cv2.VideoWriter(self.sequence_video_path, 0, 10, (int(self.video.width), int(self.video.height)))
+            debug_video = cv2.VideoWriter(self.sequence_video_path, 0, 10, (self.video.width, self.video.height))
 
         detector = Detector(model_basename=self.model_basename)
         board_detector = BoardDetector()
         sequence = np.zeros((len(self.video), 64, len(CLASSES)))
         boxes = []
 
-        if not infer_keypoints and self.video.new_keypoints is None:
+        if not infer_keypoints and self.video_config.keypoints is None:
             print(f'No keypoints for {self.dataset}. Switching to infer mode.')
             infer_keypoints = True
 
         if infer_keypoints:
             keypoints = None
         else:
-            keypoints = {k: v for k, v in zip(CORNERS, self.video.new_keypoints)}
+            keypoints = {k: v for k, v in zip(CORNERS, self.video_config.keypoints)}
 
         for i, (image, frame) in tqdm(enumerate(self.video), desc='Creating sequence', total=len(self.video)):
-            preds = detector.run(np.expand_dims(image, axis=0))[0]
+            preds = detector.run(image, keypoints)
 
             conf = np.max(preds[:, 4:], axis=1)
             conf_mask = conf > 0.1

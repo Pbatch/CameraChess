@@ -8,12 +8,13 @@ import numpy as np
 from PIL import ImageOps, Image
 from tqdm import tqdm
 
-from camera_chess.constants import SQUARE_SIZE, YOLO_DIR, DATA_DIR
-from camera_chess.data_cleaning.make_yolo_data import DATASETS
+from camera_chess.constants import SQUARE_SIZE, DATA_DIR, XCORNERS_DIR, DATASETS
 from camera_chess.utils import clear_dir, warp
 
 
-def process_dataset(split, dataset, image_size):
+def process_dataset(split, dataset, model_width, model_height, debug):
+    train_size = max(model_width, model_height)
+
     label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
     for label_path in tqdm(label_paths, desc=dataset):
         with open(label_path, 'r') as f:
@@ -26,10 +27,10 @@ def process_dataset(split, dataset, image_size):
 
         image_path = label_path.replace('labels', 'images').replace('.json', '.jpg')
         id_ = f'{dataset.replace(os.path.sep, "_")}_{os.path.splitext(os.path.basename(image_path))[0]}'
-        new_image_path = os.path.join(YOLO_DIR, split, 'images', f'{id_}.jpg')
+        new_image_path = os.path.join(XCORNERS_DIR, split, 'images', f'{id_}.jpg')
 
         image = Image.open(image_path)
-        image = ImageOps.contain(image, (image_size, image_size))
+        image = ImageOps.contain(image, (train_size, train_size))
         image.save(new_image_path)
 
         grid = np.mgrid[1:8, 1:8].reshape(2, -1).T.astype(np.float32) * SQUARE_SIZE
@@ -45,25 +46,28 @@ def process_dataset(split, dataset, image_size):
         else:
             h /= ratio
         output = [f"{class_id} {xc} {yc} {w} {h}" for xc, yc in square_centers]
-        new_label_path = os.path.join(YOLO_DIR, split, 'labels', f'{id_}.txt')
+        new_label_path = os.path.join(XCORNERS_DIR, split, 'labels', f'{id_}.txt')
         with open(new_label_path, 'w') as f:
             f.write('\n'.join(output))
 
 
-def main(image_size):
+def main(model_width, model_height, debug):
     for split in DATASETS.keys():
         for i in ['images', 'labels']:
-            clear_dir(os.path.join(YOLO_DIR, split, i))
+            clear_dir(os.path.join(XCORNERS_DIR, split, i))
 
     for split, datasets in DATASETS.items():
         for dataset in datasets:
-            process_dataset(split, dataset, image_size)
+            process_dataset(split, dataset, model_width, model_height, debug)
 
-    subprocess.call(['tar', '-czf', 'yolo.tar.gz', 'yolo'], cwd=DATA_DIR)
+    tar_dir = os.path.relpath(XCORNERS_DIR, DATA_DIR)
+    subprocess.call(['tar', '-czf', f'{tar_dir}.tar.gz', tar_dir], cwd=DATA_DIR)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--image_size', type=int, default=480)
+    parser.add_argument('-mw', '--model_width', type=int, default=640)
+    parser.add_argument('-mh', '--model_height', type=int, default=384)
+    parser.add_argument('-d', '--debug', action='store_true')
     args = parser.parse_args()
-    main(args.image_size)
+    main(args.model_width, args.model_height, args.debug)

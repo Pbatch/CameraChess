@@ -92,8 +92,7 @@ def plot_scores(scores, plot_path):
     plt.savefig(plot_path)
 
 
-def main(force):
-    model_basename = "480S.pt"
+def main(model_basename, force):
     run_id = f"{dt.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}_{model_basename.split('.')[0]}"
     scores_path = os.path.join(DATA_DIR, f'{run_id}_scores.json')
     plot_path = os.path.join(DATA_DIR, f'{run_id}_plot.jpg')
@@ -108,6 +107,7 @@ def main(force):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--model_basename', '-m', type=str, required=True)
     parser.add_argument('--force', '-f', action="store_true")
     args = parser.parse_args()
-    main(args.force)
+    main(args.model_basename, args.force)

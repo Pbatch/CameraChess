@@ -7,8 +7,8 @@ STUDIO_IMAGE_DIR = os.path.join(STUDIO_DIR, 'files', 'images')
 STUDIO_LABEL_DIR = os.path.join(STUDIO_DIR, 'files', 'labels')
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 MODEL_DIR = os.path.join(ROOT_DIR, 'models')
-YOLO_DIR = os.path.join(DATA_DIR, 'yolo')
-KEYPOINTS_DIR = os.path.join(DATA_DIR, 'keypoints')
+PIECES_DIR = os.path.join(DATA_DIR, 'pieces')
+XCORNERS_DIR = os.path.join(DATA_DIR, 'xcorners')
 
 CLASS_TO_PIECE = {'black-bishop': chess.Piece(chess.BISHOP, chess.BLACK),
                   'black-king': chess.Piece(chess.KING, chess.BLACK),
@@ -99,3 +99,39 @@ LICHESS_TOKEN_PETER = "lip_3Km8pHjYCeNkTRL7HODE"
 
 # username = "babyeatingbishop"
 LICHESS_TOKEN_CONOR = "lip_KHK4q3qAH5TFUfbX83zP"
+
+# Could add chessvision/train to synthetic data (200k images...)
+# TODO: How do we add back empty images like "Google Empty" with no keypoints data? (single piece are similar)
+# TODO: Label corners for all datasets
+DATASETS = {
+    # 'synthetic': ['chesscog',
+    #               'chessred2k',
+    #               *[os.path.join('chessvision', s) for s in ['test']],
+    #               *[os.path.join('roboflow', s) for s in ['7', '10']]
+    #               ],
+    'val': ['google',
+            os.path.join('peter', 'scholars_mate'),
+            os.path.join('youtube', 'carlsen_vidit'),
+            os.path.join('four_corners', 'caro'),
+            os.path.join('mercato', 'english')],
+    'train': [*[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
+                                                     'harika_nana', 'anand_carlsen', 'gukesh_shakh',
+                                                     'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',
+                                                     'hans_rinat', 'retired_lawyer', 'ramirez_yoo']],
+              *[os.path.join('peter', s) for s in ['smothered_mate', 'kasparov_immortal', 'peter_emma',
+                                                   'wells_shirov', 'gerasimov_smyslov', 'bronstein_teschner',
+                                                   'melgosa_zuluaga', 'campora_morozevich', 'eingorn_vaganian',
+                                                   'tal_sviridov', 'larsen_spassky', 'furman_spassky',
+                                                   'wells_speelman', 'glass_1', 'glass_2', 'glass_3', 'pub']],
+              *[os.path.join('big_stand', s) for s in ['slav', 'berlin']],
+              *[os.path.join('small_stand', s) for s in ['slav', 'berlin']],
+              *[os.path.join('four_corners', s) for s in ['french', 'london', 'ponziani', 'tromp']],
+              *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'james', 'reti', 'gambit',
+                                                     'ruy', 'slav', 'vienna']],
+              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11',
+                                                      'public', 'ppp']],
+              *[os.path.join('peter_wooden', s) for s in ['scholars_mate', 'smothered_mate', 'gerasimov_smyslov',
+                                                          'wells_shirov']],
+              *[os.path.join('tom', s) for s in ['slav', 'italian', 'spanish']]
+              ]
+}

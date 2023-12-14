@@ -10,8 +10,7 @@ from scipy.spatial import Delaunay
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
 
-from camera_chess.constants import MODEL_DIR, YOLO_DIR, CORNERS
-from camera_chess.export.wrapped_model import load_model
+from camera_chess.constants import CORNERS, PIECES_DIR
 
 
 class BoardDetector:
@@ -23,8 +22,8 @@ class BoardDetector:
         self.iou_thresh = iou_thresh
         self.conf_thresh = conf_thresh
 
-        self.model = load_model(model_path=os.path.join(MODEL_DIR, self.model_basename),
-                                device=self.device)
+        # self.model = load_model(model_path=os.path.join(MODEL_DIR, self.model_basename),
+        #                         device=self.device)
 
     @staticmethod
     def _apply_transform(src, transform):
@@ -216,7 +215,7 @@ class BoardDetector:
 
 
 def main():
-    label_paths = list(glob(os.path.join(YOLO_DIR, 'val', 'labels', '*')))
+    label_paths = list(glob(os.path.join(PIECES_DIR, 'val', 'labels', '*')))
     detector = BoardDetector()
 
     os.makedirs('debug', exist_ok=True)

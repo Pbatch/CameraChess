@@ -143,7 +143,7 @@ def main(dataset, model_basename, force):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', '-d', type=str, required=True)
-    parser.add_argument('--model_basename', '-m', type=str, default="480N.pt")
+    parser.add_argument('--model_basename', '-m', type=str, default="640S.onnx")
     parser.add_argument('--force', '-f', action="store_true")
     args = parser.parse_args()
     main(args.dataset, args.model_basename, args.force)

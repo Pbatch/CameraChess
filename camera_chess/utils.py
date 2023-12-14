@@ -1,5 +1,4 @@
 import os
-import pickle
 import shutil
 from collections import namedtuple
 from glob import glob
@@ -13,12 +12,6 @@ from PIL import ImageFont
 from camera_chess.constants import DATA_DIR, BOARD_SIZE
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves roi")
-
-
-def get_square(idx):
-    x = idx // 8
-    y = idx % 8
-    return f'{chr(x + 97)}{8 - y}'
 
 
 def load_video_config(dataset):
@@ -76,14 +69,6 @@ def warp(src, keypoints):
     return warped_src
 
 
-def serialize(obj):
-    return pickle.dumps(obj).decode("ISO-8859-1")
-
-
-def deserialize(s):
-    return pickle.loads(s.encode("ISO-8859-1"))
-
-
 def update_state(state, update, decay=0.5):
     state *= decay
     state += (1 - decay) * update
@@ -117,3 +102,39 @@ def draw_points(d, xy, colour, radius=5):
 def draw_lines(d, xy, colour, width=5):
     for i in range(len(xy)):
         d.line([*xy[i-1], *xy[i]], fill=colour, width=width)
+
+
+def get_roi(keypoints, width, height, model_width, model_height, padding_ratio=12):
+    x_min = np.min(keypoints[:, 0])
+    x_max = np.max(keypoints[:, 0])
+    y_min = np.min(keypoints[:, 1])
+    y_max = np.max(keypoints[:, 1])
+
+    roi_width = x_max - x_min
+    roi_height = y_max - y_min
+    padding_left = roi_width // padding_ratio
+    padding_right = roi_width // padding_ratio
+    padding_top = roi_height // padding_ratio
+    padding_bottom = roi_height // padding_ratio
+
+    padded_roi_width = roi_width + padding_left + padding_right
+    padded_roi_height = roi_height + padding_top + padding_bottom
+    ratio = padded_roi_height / padded_roi_width
+    desired_ratio = model_height / model_width
+
+    if ratio > desired_ratio:
+        target_width = padded_roi_height / desired_ratio
+        dx = target_width - padded_roi_width
+        padding_left += dx // 2
+        padding_right += dx - (dx // 2)
+    else:
+        target_height = padded_roi_width * desired_ratio
+        padding_top += target_height - padded_roi_height
+
+    roi = [int(max(x_min - padding_left, 0)),
+           int(max(y_min - padding_top, 0)),
+           int(min(x_max + padding_right, width)),
+           int(min(y_max + padding_bottom, height))]
+    return roi
+
+
