@@ -15,5 +15,5 @@
 Tar scripts for Google Drive
 ```bash
 tar -zcvf models.tar.gz models
-tar --exclude='*.webm' --exclude='*.tar.gz' --exclude='*.mp4' -zcvf data.tar.gz data
+tar --exclude='*.webm' --exclude='*.tar.gz' --exclude='*.MOV' --exclude='*.mov' --exclude='*.mp4' --exclude='*.avi' --exclude='*.npy' --exclude='data/chesscog' --exclude='data/chessred2k' --exclude='data/chessvision' -zcvf data.tar.gz data
 ```

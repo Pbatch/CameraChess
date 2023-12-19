@@ -34,6 +34,7 @@ def process_dataset(split, dataset, model_width, model_height, debug, iomin_thre
     train_size = max(model_width, model_height)
 
     label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
+    label_paths.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
     for label_path in tqdm(label_paths, desc=dataset):
         with open(label_path, 'r') as f:
             label = json.load(f)
@@ -48,8 +49,13 @@ def process_dataset(split, dataset, model_width, model_height, debug, iomin_thre
         pieces = [bbox[0] for bbox in label['bboxes']]
         bboxes = np.array([bbox[1:] for bbox in label['bboxes']])
 
-        keypoints[:, 0] *= image.width
-        keypoints[:, 1] *= image.height
+        try:
+            keypoints[:, 0] *= image.width
+            keypoints[:, 1] *= image.height
+        except IndexError:
+            print(f'Bad keypoints at "{label_path}". Skipping...')
+            print(keypoints)
+            continue
         roi = get_roi(keypoints, image.width, image.height, model_width, model_height)
 
         if len(bboxes):

@@ -102,7 +102,7 @@ LICHESS_TOKEN_CONOR = "lip_KHK4q3qAH5TFUfbX83zP"
 
 # Could add chessvision/train to synthetic data (200k images...)
 # TODO: How do we add back empty images like "Google Empty" with no keypoints data? (single piece are similar)
-# TODO: Label corners for all datasets
+# For similar reasons ignore "roboflow/ppp", "roboflow/public" and "roboflow/9"
 DATASETS = {
     # 'synthetic': ['chesscog',
     #               'chessred2k',
@@ -128,8 +128,7 @@ DATASETS = {
               *[os.path.join('four_corners', s) for s in ['french', 'london', 'ponziani', 'tromp']],
               *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'james', 'reti', 'gambit',
                                                      'ruy', 'slav', 'vienna']],
-              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '9', '11',
-                                                      'public', 'ppp']],
+              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '11']],
               *[os.path.join('peter_wooden', s) for s in ['scholars_mate', 'smothered_mate', 'gerasimov_smyslov',
                                                           'wells_shirov']],
               *[os.path.join('tom', s) for s in ['slav', 'italian', 'spanish']]
