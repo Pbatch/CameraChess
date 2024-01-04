@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from camera_chess.board_detection.board_detector import BoardDetector
+from camera_chess.board_detector import BoardDetector
 from camera_chess.constants import BOARD_SIZE, SQUARE_SIZE, CLASSES, ABBR_MAP, DATA_DIR, CORNERS
 from camera_chess.detector import Detector
 from camera_chess.utils import load_video_config, update_state, draw_lines, draw_text

@@ -130,7 +130,10 @@ DATASETS = {
                                                      'ruy', 'slav', 'vienna']],
               *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '11']],
               *[os.path.join('peter_wooden', s) for s in ['scholars_mate', 'smothered_mate', 'gerasimov_smyslov',
-                                                          'wells_shirov']],
-              *[os.path.join('tom', s) for s in ['slav', 'italian', 'spanish']]
+                                                          'wells_shirov', 'kasparov_immortal', 'wells_speelman',
+                                                          'tal_sviridov']],
+              *[os.path.join('tom', s) for s in ['slav', 'italian', 'spanish']],
+              *[os.path.join('seb', s) for s in ['aly_alpha', 'gaspard_alpha', 'gaspard_aly',
+                                                 'aly_ulysse', 'ulysse_aly', 'seb_mich']]
               ]
 }

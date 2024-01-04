@@ -44,7 +44,7 @@ def load_label_studio():
 def load_yolo(pred_dir):
     samples = []
     for split in ['train']:
-        paths = glob(os.path.join(DATA_DIR, 'yolo', split, 'labels', '*.txt'))
+        paths = glob(os.path.join(DATA_DIR, 'pieces', split, 'labels', '*.txt'))
         for label_path in tqdm(sorted(paths)):
             image_path = label_path.replace('labels', 'images', 1).replace('.txt', '.jpg')
             source_dataset = '_'.join(os.path.basename(label_path).split('_')[:-1])

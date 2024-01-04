@@ -13,11 +13,11 @@ from camera_chess.tracker import Tracker
 from camera_chess.utils import clear_dir
 
 
-def main(dataset):
+def main(dataset, model_basename):
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
-    sequence_generator = SequenceGenerator(dataset)
+    sequence_generator = SequenceGenerator(dataset, model_basename)
     _, boxes = sequence_generator.create_sequence()
 
     video = sequence_generator.video
@@ -27,7 +27,7 @@ def main(dataset):
                           'to_name': 'img-1',
                           'type': 'keypointlabels'}
     keypoints_labels = []
-    for (x, y), square in zip(video.new_keypoints, CORNERS):
+    for (x, y), square in zip(video.video_config.keypoints, CORNERS):
         keypoints_label = keypoints_template.copy()
         keypoints_label['value'] = {'x': 100 * x / video.width,
                                     'y': 100 * y / video.height,
@@ -35,7 +35,7 @@ def main(dataset):
                                     'keypointlabels': [square]}
         keypoints_labels.append(keypoints_label)
 
-    tracker = Tracker(dataset)
+    tracker = Tracker(dataset, model_basename)
     logs = tracker.process_sequence(sequence_generator.sequence_path)
 
     board = chess.Board(fen=sequence_generator.video_config.fen)
@@ -89,5 +89,6 @@ def main(dataset):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', '-d', type=str, required=True)
+    parser.add_argument('--model_basename', '-m', type=str, default="640S.onnx")
     args = parser.parse_args()
-    main(args.dataset)
+    main(args.dataset, args.model_basename)
