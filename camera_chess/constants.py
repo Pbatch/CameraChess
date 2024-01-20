@@ -114,7 +114,8 @@ DATASETS = {
             os.path.join('youtube', 'carlsen_vidit'),
             os.path.join('four_corners', 'caro'),
             os.path.join('mercato', 'english')],
-    'train': [*[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
+    'train': ['google_empty',
+              *[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
                                                      'harika_nana', 'anand_carlsen', 'gukesh_shakh',
                                                      'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',
                                                      'hans_rinat', 'retired_lawyer', 'ramirez_yoo']],
@@ -134,6 +135,8 @@ DATASETS = {
                                                           'tal_sviridov']],
               *[os.path.join('tom', s) for s in ['slav', 'italian', 'spanish']],
               *[os.path.join('seb', s) for s in ['aly_alpha', 'gaspard_alpha', 'gaspard_aly',
-                                                 'aly_ulysse', 'ulysse_aly', 'seb_mich']]
+                                                 'aly_ulysse', 'ulysse_aly', 'seb_mich', 'jc_seb', 'seb_jc',
+                                                 'jc_seb_3', 'seb_jc_3', 'seb_jc_6', 'jc_seb_6']]
               ]
 }
+EMPTY_DATASETS = {'google_empty'}

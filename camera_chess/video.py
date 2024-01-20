@@ -32,5 +32,5 @@ class Video:
         return len(self.frames)
 
     def save_start_image(self):
-        image = self.vr[self.frames[50]].asnumpy()
+        image = self.vr[self.frames[500]].asnumpy()
         Image.fromarray(image).save('start_image.jpg')

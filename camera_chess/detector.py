@@ -12,15 +12,18 @@ Detections = namedtuple("Detections", "xyxy conf cls")
 
 
 class Detector:
-    def __init__(self, model_basename, model_width=640, model_height=384, fill_colour=114, device='cuda:0'):
+    def __init__(self, model_basename, fill_colour=114, device='cuda:0'):
         self.model_basename = model_basename
-        self.model_width = model_width
-        self.model_height = model_height
         self.fill_colour = fill_colour
         self.device = device
 
         self.sess = ort.InferenceSession(os.path.join(MODEL_DIR, self.model_basename),
                                          providers=['CUDAExecutionProvider'])
+
+        # B, C, H, W
+        input_shape = self.sess.get_inputs()[0].shape
+        self.model_height = input_shape[2]
+        self.model_width = input_shape[3]
         self.desired_ratio = self.model_height / self.model_width
 
     def _resize(self, x):

@@ -13,7 +13,7 @@ from camera_chess.tracker import Tracker
 from camera_chess.utils import clear_dir
 
 
-def main(dataset, model_basename):
+def main(dataset, model_basename, ignore):
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
 
@@ -65,7 +65,9 @@ def main(dataset, model_basename):
         dets = boxes[boxes[:, 0] == i]
         for square, l, t, r, b, cls, conf in dets[:, 1:]:
             square = int(square)
-            if square == -1:
+            if square == -1 and ignore:
+                continue
+            elif square == -1:
                 cls = CLASSES[int(cls)]
             else:
                 piece = board.piece_at(square)
@@ -89,6 +91,7 @@ def main(dataset, model_basename):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', '-d', type=str, required=True)
-    parser.add_argument('--model_basename', '-m', type=str, default="640S.onnx")
+    parser.add_argument('--model_basename', '-m', type=str, default="480S_pieces_480x288.onnx")
+    parser.add_argument('--ignore', '-i', action='store_true')
     args = parser.parse_args()
-    main(args.dataset, args.model_basename)
+    main(args.dataset, args.model_basename, args.ignore)

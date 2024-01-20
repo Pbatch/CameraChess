@@ -13,6 +13,7 @@ from camera_chess.utils import clear_dir, warp
 
 
 def process_dataset(split, dataset, model_width, model_height, debug):
+    # TODO: Add visual debugging
     train_size = max(model_width, model_height)
 
     label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
@@ -66,8 +67,8 @@ def main(model_width, model_height, debug):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-mw', '--model_width', type=int, default=640)
-    parser.add_argument('-mh', '--model_height', type=int, default=384)
+    parser.add_argument('-mw', '--model_width', type=int, default=480)
+    parser.add_argument('-mh', '--model_height', type=int, default=288)
     parser.add_argument('-d', '--debug', action='store_true')
     args = parser.parse_args()
     main(args.model_width, args.model_height, args.debug)
