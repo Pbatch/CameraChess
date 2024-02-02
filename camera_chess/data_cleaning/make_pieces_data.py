@@ -30,7 +30,8 @@ def calculate_iomin(roi, bboxes):
     return iomin
 
 
-def process_dataset(split, dataset, model_width, model_height, debug, iomin_threshold=0.5):
+def process_dataset(split, dataset, model_width, model_height, debug, single_class, need_keypoints,
+                    iomin_threshold=0.5):
     train_size = max(model_width, model_height)
 
     label_paths = list(glob(os.path.join(DATA_DIR, dataset, 'labels', '*')))
@@ -49,11 +50,13 @@ def process_dataset(split, dataset, model_width, model_height, debug, iomin_thre
             image.save(new_image_path)
             continue
 
-        if 'keypoints' not in label:
-            print(label_path)
+        if 'keypoints' in label:
+            keypoints = np.array(list(label['keypoints'].values()))
+        elif need_keypoints:
             continue
+        else:
+            keypoints = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], dtype=np.float32)
 
-        keypoints = np.array(list(label['keypoints'].values()))
         pieces = [bbox[0] for bbox in label['bboxes']]
         bboxes = np.array([bbox[1:] for bbox in label['bboxes']])
 
@@ -87,7 +90,10 @@ def process_dataset(split, dataset, model_width, model_height, debug, iomin_thre
 
         output = []
         for piece, bbox in zip(pieces, bboxes):
-            class_id = CLASSES.index(piece)
+            if single_class:
+                class_id = 0
+            else:
+                class_id = CLASSES.index(piece)
             xc = (bbox[0] + bbox[2]) / (2 * crop_width)
             yc = (bbox[1] + bbox[3]) / (2 * crop_height)
             w = (bbox[2] - bbox[0]) / crop_width
@@ -111,14 +117,15 @@ def process_dataset(split, dataset, model_width, model_height, debug, iomin_thre
             input()
 
 
-def main(model_width, model_height, debug):
+def main(model_width, model_height, debug, single_class):
     for split in DATASETS.keys():
         for i in ['images', 'labels']:
             clear_dir(os.path.join(PIECES_DIR, split, i))
 
     for split, datasets in DATASETS.items():
+        need_keypoints = split != 'synthetic'
         for dataset in datasets:
-            process_dataset(split, dataset, model_width, model_height, debug)
+            process_dataset(split, dataset, model_width, model_height, debug, single_class, need_keypoints)
 
     tar_dir = os.path.relpath(PIECES_DIR, DATA_DIR)
     subprocess.call(['tar', '-czf', f'{tar_dir}.tar.gz', tar_dir], cwd=DATA_DIR)
@@ -129,5 +136,6 @@ if __name__ == '__main__':
     parser.add_argument('-mw', '--model_width', type=int, default=480)
     parser.add_argument('-mh', '--model_height', type=int, default=288)
     parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-s', '--single_class', action='store_true')
     args = parser.parse_args()
-    main(args.model_width, args.model_height, args.debug)
+    main(args.model_width, args.model_height, args.debug, args.single_class)

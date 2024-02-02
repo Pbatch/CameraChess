@@ -16,10 +16,11 @@ def main(dataset, export_id):
 
     os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'))
     os.makedirs(os.path.join(DATA_DIR, dataset, 'images'))
-    for i, label in enumerate(tqdm(labels)):
+    for label in tqdm(labels):
         new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
                      'bboxes': []}
         basename = os.path.basename(label['data']['img'])
+        position = os.path.splitext(basename)[0]
 
         for annotation in label['annotations'][0]['result']:
             value = annotation['value']
@@ -37,16 +38,13 @@ def main(dataset, export_id):
 
         if all([len(v) == 0 for v in new_label['keypoints'].values()]):
             new_label.pop('keypoints')
-        new_label_path = f'data/{dataset}/labels/{os.path.split}.json'
+        new_label_path = f'data/{dataset}/labels/{position}.json'
         with open(new_label_path, 'w') as f:
             json.dump(new_label, f, indent=4)
 
-
         image = Image.open(os.path.join('label_studio', 'files', 'images', basename))
         image = image.convert('RGB')
-        print(basename)
-        exit(1)
-        new_image_path = f'data/{dataset}/images/{i}.jpg'
+        new_image_path = f'data/{dataset}/images/{position}.jpg'
         image.save(new_image_path)
 
         if verbose:

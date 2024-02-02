@@ -1,13 +1,12 @@
 import json
 import os
 from collections import defaultdict
-from glob import glob
 
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import CORNERS, DATA_DIR
+from camera_chess.constants import DATA_DIR
 from camera_chess.utils import clear_dir
 
 
