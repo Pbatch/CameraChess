@@ -121,7 +121,7 @@ def process_preds(preds, conf, boundary, centers, frame=0, sequence=None):
     cls = np.expand_dims(np.argmax(preds[keep, 4:], axis=1), axis=1)
     frame_info = np.concatenate([idx, squares, frame_boxes, cls, max_conf], axis=1).tolist()
 
-    return frame_info, frame_boxes
+    return frame_info
 
 
 class SequenceGenerator:
@@ -199,7 +199,9 @@ class SequenceGenerator:
         else:
             keypoints = {k: v for k, v in zip(CORNERS, self.video_config.keypoints)}
 
-        for i, (image, frame) in tqdm(enumerate(self.video), desc='Creating sequence', total=len(self.video)):
+        for i, (image, frame) in tqdm(enumerate(self.video),
+                                      desc=f'Creating sequence for {self.dataset}',
+                                      total=len(self.video)):
             preds = detector.run(image, keypoints)
 
             conf = np.max(preds[:, 4:], axis=1)

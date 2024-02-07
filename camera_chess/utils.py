@@ -9,7 +9,7 @@ import numpy as np
 import yaml
 from PIL import ImageFont
 
-from camera_chess.constants import DATA_DIR, BOARD_SIZE
+from camera_chess.constants import DATA_DIR, BOARD_SIZE, CLASSES
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves roi")
 
@@ -101,7 +101,7 @@ def draw_points(d, xy, colour, radius=5):
 
 def draw_lines(d, xy, colour, width=5):
     for i in range(len(xy)):
-        d.line([*xy[i-1], *xy[i]], fill=colour, width=width)
+        d.line([*xy[i - 1], *xy[i]], fill=colour, width=width)
 
 
 def get_roi(keypoints, width, height, model_width, model_height, padding_ratio=12):
@@ -136,5 +136,3 @@ def get_roi(keypoints, width, height, model_width, model_height, padding_ratio=1
            int(min(x_max + padding_right, width)),
            int(min(y_max + padding_bottom, height))]
     return roi
-
-
