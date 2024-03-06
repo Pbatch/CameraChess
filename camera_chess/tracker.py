@@ -130,14 +130,14 @@ class Tracker:
         return logs
 
 
-def main(dataset, model_basename, force_sequence, force_tracker):
+def main(dataset, model_basename, force_sequence, force_tracker, debug):
     sequence_generator = SequenceGenerator(dataset, model_basename)
-    sequence_generator.create_sequence(force=force_sequence, debug=True)
+    sequence_generator.create_sequence(force=force_sequence, debug=debug)
 
     tracker = Tracker(dataset, model_basename=sequence_generator.model_basename)
     tracker.process_sequence(sequence_generator.sequence_path, force=force_tracker)
 
-    sequence_generator.create_video(tracker.logs_path)
+    # sequence_generator.create_video(tracker.logs_path)
 
 
 if __name__ == '__main__':
@@ -146,5 +146,6 @@ if __name__ == '__main__':
     parser.add_argument('--model_basename', '-m', type=str, default="480S_pieces_480x288.onnx")
     parser.add_argument('--force_sequence', '-fs', action="store_true")
     parser.add_argument('--force_tracker', '-ft', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
-    main(args.dataset, args.model_basename, args.force_sequence, args.force_tracker)
+    main(args.dataset, args.model_basename, args.force_sequence, args.force_tracker, args.debug)

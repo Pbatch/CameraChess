@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 
+import numpy as np
 from imagesize import imagesize
 from tqdm import tqdm
 
@@ -12,7 +13,7 @@ from camera_chess.utils import clear_dir
 
 
 def main():
-    dataset_id = 'public'
+    dataset_id = 'final_chess_piece'
     image_paths = sorted(glob(os.path.join(DATA_DIR, 'roboflow', str(dataset_id), 'images', '*.jpg')))
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
@@ -37,6 +38,25 @@ def main():
                   'type': 'rectanglelabels'}
         with open(yolo_path, 'r') as f:
             lines = [line.strip().split() for line in f.readlines()]
+
+        # Segmentation masks
+        for i, line in enumerate(lines):
+            if len(line) == 5:
+                continue
+
+            points = np.array([[line[2 * i + 1], line[2 * i + 2]]
+                               for i in range(len(line) // 2)], dtype=np.float32)
+            left = min(points[:, 0])
+            right = max(points[:, 0])
+            top = min(points[:, 1])
+            bottom = max(points[:, 1])
+
+            xc = (left + right) / 2
+            yc = (top + bottom) / 2
+            width = right - left
+            height = bottom - top
+
+            lines[i] = [line[0], xc, yc, width, height]
 
         try:
             for class_id, xc, yc, w, h in lines:

@@ -1,9 +1,9 @@
 import os
 from collections import namedtuple
 
+import cv2
 import numpy as np
 import onnxruntime as ort
-from PIL import Image
 
 from camera_chess.constants import MODEL_DIR, CORNERS
 from camera_chess.utils import get_roi
@@ -17,13 +17,17 @@ class Detector:
         self.fill_colour = fill_colour
         self.device = device
 
+        providers = [('CUDAExecutionProvider', {"cudnn_conv_algo_search": "DEFAULT"})]
         self.sess = ort.InferenceSession(os.path.join(MODEL_DIR, self.model_basename),
-                                         providers=['CUDAExecutionProvider'])
+                                         providers=providers)
+        self.inputs = self.sess.get_inputs()[0]
+        self.outputs = self.sess.get_outputs()[0]
+        self.io_binding = self.sess.io_binding()
+        self.io_binding.bind_output(self.outputs.name)
 
-        # B, C, H, W
-        input_shape = self.sess.get_inputs()[0].shape
-        self.model_height = input_shape[2]
-        self.model_width = input_shape[3]
+        # shape should be B, C, H, W
+        self.model_height = self.inputs.shape[2]
+        self.model_width = self.inputs.shape[3]
         self.desired_ratio = self.model_height / self.model_width
 
     def _resize(self, x):
@@ -36,7 +40,7 @@ class Detector:
             width = self.model_width
             height = int(self.model_width * ratio)
 
-        x = np.array(Image.fromarray(x).resize((width, height)))
+        x = cv2.resize(x, (width, height))
 
         return x
 
@@ -85,12 +89,14 @@ class Detector:
         # Resize, pad and scale
         image = self._resize(image)
         image, padding = self._pad(image)
-        image = image.astype(np.float32) / 255
+        image = image.astype(np.float16) / 255
         image = np.transpose(image, (2, 0, 1))
+        image = np.expand_dims(image, axis=0)
 
         # Inference
-        y = self.sess.run(None, {'images': np.expand_dims(image, 0)})[0][0]
-        y = np.transpose(y, (1, 0))
+        self.io_binding.bind_cpu_input(self.inputs.name, image)
+        self.sess.run_with_iobinding(self.io_binding)
+        y = self.io_binding.copy_outputs_to_cpu()[0][0].astype(np.float32)
 
         # Rescale bboxes to match original image size
         y = self._fix_bboxes(y, roi, padding)

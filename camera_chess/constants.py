@@ -126,7 +126,7 @@ DATASETS = {
               *[os.path.join('four_corners', s) for s in ['french', 'london', 'ponziani', 'tromp']],
               *[os.path.join('mercato', s) for s in ['bogdan', 'elephant', 'james', 'reti', 'gambit',
                                                      'ruy', 'slav', 'vienna']],
-              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '11']],
+              *[os.path.join('roboflow', s) for s in ['1', '2', '3', '4', '5', '6', '8', '11', 'final_chess_piece']],
               *[os.path.join('peter_wooden', s) for s in ['scholars_mate', 'smothered_mate', 'gerasimov_smyslov',
                                                           'wells_shirov', 'kasparov_immortal', 'wells_speelman',
                                                           'tal_sviridov']],

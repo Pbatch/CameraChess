@@ -8,7 +8,7 @@ import torchvision
 from icecream import ic
 from tqdm import tqdm
 
-from camera_chess.constants import YOLO_DIR, CLASSES
+from camera_chess.constants import PIECES_DIR, CLASSES
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
                           'black-rook': 2,
                           'white-knight': 2,
                           'black-knight': 2}
-    for label_path in tqdm(sorted(glob(os.path.join(YOLO_DIR, 'train', 'labels', '*.txt')))):
+    for label_path in tqdm(sorted(glob(os.path.join(PIECES_DIR, 'train', 'labels', '*.txt')))):
         with open(label_path) as f:
             lines = [line.strip() for line in f.readlines()]
 

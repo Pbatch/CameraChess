@@ -7,9 +7,8 @@ import chess.pgn
 import cv2
 import numpy as np
 import yaml
-from PIL import ImageFont
 
-from camera_chess.constants import DATA_DIR, BOARD_SIZE, CLASSES
+from camera_chess.constants import DATA_DIR, BOARD_SIZE
 
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves roi")
 
@@ -74,36 +73,6 @@ def update_state(state, update, decay=0.5):
     state += (1 - decay) * update
 
 
-def draw_text(d, bbox, text):
-    font = ImageFont.load_default()
-    _, _, text_width, text_height = font.getbbox(text)
-    y_offset = -10
-    x = (bbox[0] + bbox[2] - text_width) / 2
-    y = bbox[1] - y_offset
-
-    mid_x = (bbox[0] + bbox[2]) / 2
-    text_bbox = (mid_x - text_width / 2 - 5,
-                 bbox[1] - y_offset - text_height,
-                 mid_x + text_width / 2 + 5,
-                 bbox[1] - y_offset)
-    d.rectangle(text_bbox,
-                fill='black')
-    d.rectangle(tuple(bbox))
-    d.text((x, y - text_height), text=text)
-
-
-def draw_points(d, xy, colour, radius=5):
-    for x, y in xy:
-        bbox = [x - radius, y - radius,
-                x + radius, y + radius]
-        d.ellipse(bbox, fill=colour)
-
-
-def draw_lines(d, xy, colour, width=5):
-    for i in range(len(xy)):
-        d.line([*xy[i - 1], *xy[i]], fill=colour, width=width)
-
-
 def get_roi(keypoints, width, height, model_width, model_height, padding_ratio=12):
     x_min = np.min(keypoints[:, 0])
     x_max = np.max(keypoints[:, 0])
@@ -136,3 +105,32 @@ def get_roi(keypoints, width, height, model_width, model_height, padding_ratio=1
            int(min(x_max + padding_right, width)),
            int(min(y_max + padding_bottom, height))]
     return roi
+
+
+def draw_points(d, xy, colour, radius=5):
+    for x, y in xy:
+        bbox = [x - radius, y - radius,
+                x + radius, y + radius]
+        d.ellipse(bbox, fill=colour)
+
+
+def draw_lines(d, xy, colour, width=5):
+    for i in range(len(xy)):
+        d.line([*xy[i - 1], *xy[i]], fill=colour, width=width)
+
+
+def draw_text(d, bbox, text, text_height=12):
+    text_width = len(text) * 5
+    y_offset = -10
+    x = (bbox[0] + bbox[2] - text_width) / 2
+    y = bbox[1] - y_offset
+
+    mid_x = (bbox[0] + bbox[2]) / 2
+    text_bbox = (mid_x - text_width / 2 - 5,
+                 bbox[1] - y_offset - text_height,
+                 mid_x + text_width / 2 + 5,
+                 bbox[1] - y_offset)
+    d.rectangle(text_bbox,
+                fill='black')
+    d.rectangle(tuple(bbox))
+    d.text((x, y - text_height), text=text)

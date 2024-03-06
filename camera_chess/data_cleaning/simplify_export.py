@@ -37,15 +37,12 @@ def main(dataset, export_id):
 
         if all([len(v) == 0 for v in new_label['keypoints'].values()]):
             new_label.pop('keypoints')
-        new_label_path = f'data/{dataset}/labels/{os.path.split}.json'
+        new_label_path = f'data/{dataset}/labels/{i}.json'
         with open(new_label_path, 'w') as f:
             json.dump(new_label, f, indent=4)
 
-
         image = Image.open(os.path.join('label_studio', 'files', 'images', basename))
         image = image.convert('RGB')
-        print(basename)
-        exit(1)
         new_image_path = f'data/{dataset}/images/{i}.jpg'
         image.save(new_image_path)
 
