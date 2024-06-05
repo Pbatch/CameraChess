@@ -101,25 +101,37 @@ def process_preds(preds, conf, boundary, centers, frame=0, sequence=None):
 
     if sequence is not None:
         for square, pred in zip(squares[~oob], preds[~oob]):
-            sequence[frame][square] = np.maximum(sequence[frame][square], pred[4:])
-
+            if conf is None:
+                cls_idx = int(pred[5])
+                sequence[frame][square][cls_idx] = max(sequence[frame][square][cls_idx], pred[4])
+            else:
+                sequence[frame][square] = np.maximum(sequence[frame][square], pred[4:])
     squares[oob] = -1
-    sorted_idx = (-conf[~oob]).argsort()
-    unique_idx = np.unique(squares[~oob][sorted_idx], return_index=True)[1]
-    non_oob_keep = np.where(~oob)[0][sorted_idx][unique_idx]
 
-    nms_idx = torchvision.ops.nms(boxes=torch.tensor(preds[oob, :4]),
-                                  scores=torch.tensor(conf[oob]),
-                                  iou_threshold=0.5).detach().cpu().numpy()
-    oob_keep = np.where(oob)[0][nms_idx]
+    if conf is not None:
+        sorted_idx = (-conf[~oob]).argsort()
+        unique_idx = np.unique(squares[~oob][sorted_idx], return_index=True)[1]
+        non_oob_keep = np.where(~oob)[0][sorted_idx][unique_idx]
 
-    keep = list(set(non_oob_keep) | set(oob_keep))
-    idx = frame * np.ones((len(keep), 1), dtype=np.int32)
-    squares = np.expand_dims(squares[keep], axis=1)
-    frame_boxes = preds[keep, :4]
-    max_conf = np.expand_dims(conf[keep], axis=1)
-    cls = np.expand_dims(np.argmax(preds[keep, 4:], axis=1), axis=1)
-    frame_info = np.concatenate([idx, squares, frame_boxes, cls, max_conf], axis=1).tolist()
+        nms_idx = torchvision.ops.nms(boxes=torch.tensor(preds[oob, :4]),
+                                      scores=torch.tensor(conf[oob]),
+                                      iou_threshold=0.5).detach().cpu().numpy()
+        oob_keep = np.where(oob)[0][nms_idx]
+
+        keep = list(set(non_oob_keep) | set(oob_keep))
+        idx = frame * np.ones((len(keep), 1), dtype=np.int32)
+        squares = np.expand_dims(squares[keep], axis=1)
+        frame_boxes = preds[keep, :4]
+        max_conf = np.expand_dims(conf[keep], axis=1)
+        cls = np.expand_dims(np.argmax(preds[keep, 4:], axis=1), axis=1)
+        frame_info = np.concatenate([idx, squares, frame_boxes, cls, max_conf], axis=1).tolist()
+    else:
+        idx = frame * np.ones((len(preds), 1), dtype=np.int32)
+        squares = np.expand_dims(squares, axis=1)
+        frame_boxes = preds[:, :4]
+        max_conf = np.expand_dims(preds[:, 4], axis=1)
+        cls = np.expand_dims(preds[:, 5], axis=1)
+        frame_info = np.concatenate([idx, squares, frame_boxes, cls, max_conf], axis=1).tolist()
 
     return frame_info
 
@@ -147,6 +159,8 @@ class SequenceGenerator:
         self.boxes_path = os.path.join(save_dir, 'boxes.npy')
         self.video_path = os.path.join(save_dir, 'debug.mp4')
         self.sequence_video_path = os.path.join(save_dir, 'sequence_video.avi')
+
+        self.v10 = "v10" in self.model_basename
 
     def _plot_state(self, state, from_square, to_square, thr=0.7):
         size = (8 * self.PLOT_SIZE + 1, 8 * self.PLOT_SIZE + 1)
@@ -204,13 +218,17 @@ class SequenceGenerator:
                                       total=len(self.video)):
             preds = detector.run(image, keypoints)
 
-            conf = np.max(preds[:, 4:], axis=1)
-            conf_mask = conf > 0.1
-            preds = preds[conf_mask]
-            conf = conf[conf_mask]
+            if self.v10:
+                preds = preds[preds[:, 4] > 0.1]
+                conf = None
+            else:
+                conf = np.max(preds[:, 4:], axis=1)
+                conf_mask = conf > 0.1
+                preds = preds[conf_mask]
+                conf = conf[conf_mask]
 
             if infer_keypoints:
-                corners = board_detector.find_corners(image)
+                corners, _ = board_detector.find_corners(image)
                 if corners is None:
                     tqdm.write(f'Bad frame {frame}')
                     continue

@@ -1,3 +1,4 @@
+import json
 import os
 from glob import glob
 
@@ -5,25 +6,28 @@ import cv2
 import numpy as np
 import torch
 import torchvision
+from PIL import Image, ImageDraw
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import Delaunay
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
 
-from camera_chess.constants import CORNERS, PIECES_DIR
+from camera_chess.constants import CORNERS, DATA_DIR
+from camera_chess.detector import Detector
+from camera_chess.utils import draw_lines, draw_points
 
 
 class BoardDetector:
     GRID = np.concatenate(np.meshgrid(np.arange(7), np.arange(7))).reshape(2, -1).T.astype(np.float32)
 
-    def __init__(self, model_basename="480L_xcorner.pt", device='cuda:0', iou_thresh=0.1, conf_thresh=0.3):
+    def __init__(self, model_basename="480L_xcorners_480x288.onnx", device='cuda:0', iou_thresh=0.1, conf_thresh=0.3):
         self.model_basename = model_basename
         self.device = device
         self.iou_thresh = iou_thresh
         self.conf_thresh = conf_thresh
 
-        # self.model = load_model(model_path=os.path.join(MODEL_DIR, self.model_basename),
-        #                         device=self.device)
+        self.model = Detector(model_basename=self.model_basename,
+                              device=self.device)
 
     @staticmethod
     def _apply_transform(src, transform):
@@ -131,9 +135,13 @@ class BoardDetector:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)
 
-        images = torch.tensor(np.expand_dims(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), axis=0),
-                              device=self.device)
-        pred = self.model(images)[0]
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        height, width = image.shape[:2]
+        keypoints = {"h1": np.array([0, 0]),
+                     "a1": np.array([width, 0]),
+                     "a8": np.array([width, height]),
+                     "h8": np.array([0, height])}
+        pred = torch.tensor(self.model.run(image, keypoints))
         boxes = pred[:, :4]
         scores = pred[:, 4]
 
@@ -143,7 +151,6 @@ class BoardDetector:
 
         keep = torchvision.ops.nms(boxes, scores, iou_threshold=self.iou_thresh)
         boxes = boxes[keep].detach().cpu().numpy()
-        height, width = image.shape[:2]
         boxes[:, 0] = np.clip(boxes[:, 0], a_min=0, a_max=boxes[:, 2])
         boxes[:, 1] = np.clip(boxes[:, 1], a_min=0, a_max=boxes[:, 3])
         boxes[:, 2] = np.clip(boxes[:, 2], a_min=boxes[:, 0], a_max=width)
@@ -171,14 +178,15 @@ class BoardDetector:
 
     def find_corners(self, image):
         xcorners = self._find_xcorners(image)
-        if len(xcorners) < 4:
-            corners = None
-        else:
-            M, quad, score, offset = self._find_transform(xcorners)
-            corners = self._create_corners(M, offset)
-        return corners
+        if len(xcorners) < 5:
+            return None, None
 
-    def match_corners_using_preds(self, corners, preds):
+        M, quad, score, offset = self._find_transform(xcorners)
+        corners = self._create_corners(M, offset)
+        return corners, xcorners
+
+    @staticmethod
+    def match_corners_using_preds(corners, preds):
         cx = (preds[:, 0] + preds[:, 2]) / 2
         cy = preds[:, 3] - ((preds[:, 2] - preds[:, 0]) / 3)
         box_centers = np.vstack((cx, cy)).T
@@ -204,7 +212,8 @@ class BoardDetector:
 
         return keypoints
 
-    def match_corners_using_keypoints(self, corners, keypoints):
+    @staticmethod
+    def match_corners_using_keypoints(corners, keypoints):
         dist = cdist(corners, list(keypoints.values()))
         row_idx, col_idx = linear_sum_assignment(dist)
 
@@ -215,22 +224,42 @@ class BoardDetector:
 
 
 def main():
-    label_paths = list(glob(os.path.join(PIECES_DIR, 'val', 'labels', '*')))
+    label_paths = list(glob(os.path.join(DATA_DIR, 'google', 'labels', '*')))
     detector = BoardDetector()
 
     os.makedirs('debug', exist_ok=True)
+    total_score = 0
     for label_path in tqdm(label_paths):
-        image_path = label_path.replace('labels', 'images').replace('.txt', '.jpg')
+        image_path = label_path.replace('labels', 'images').replace('.json', '.jpg')
         image = cv2.imread(image_path)
-        corners = detector.find_corners(image)
 
-        if corners is not None:
-            for i in range(4):
-                cv2.line(image, corners[i - 1].astype(int), corners[i].astype(int), color=(0, 0, 255),
-                         thickness=5)
+        pred, xcorners = detector.find_corners(image)
+        if pred is None:
+            continue
 
-        save_path = os.path.join('debug', os.path.basename(image_path))
-        cv2.imwrite(save_path, image)
+        with open(label_path, 'rb') as f:
+            label = json.load(f)
+        gt = np.array(list(label['keypoints'].values()))
+        height, width = image.shape[:2]
+        gt[:, 0] *= width
+        gt[:, 1] *= height
+
+        dist = cdist(gt, pred)
+        row_idx, col_idx = linear_sum_assignment(dist)
+        score = width * height / (1000 * np.sum(dist[row_idx, col_idx]))
+        total_score += score
+        basename = os.path.basename(image_path)
+        tqdm.write(f"{basename}: {score:.3f}")
+
+        pil_image = Image.fromarray(image[..., ::-1])
+        d = ImageDraw.Draw(pil_image)
+        draw_lines(d, pred, colour='red')
+        draw_lines(d, gt, colour='blue')
+        draw_points(d, xcorners, colour="green")
+        save_path = os.path.join('debug', basename)
+        pil_image.save(save_path)
+
+    tqdm.write(f"Total: {total_score:.3f}")
 
 
 if __name__ == '__main__':

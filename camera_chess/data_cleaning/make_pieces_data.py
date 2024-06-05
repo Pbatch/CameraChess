@@ -11,8 +11,10 @@ from tqdm import tqdm
 from camera_chess.constants import CLASSES, DATA_DIR, PIECES_DIR, DATASETS, EMPTY_DATASETS
 from camera_chess.utils import clear_dir, get_roi, draw_text
 from PIL import ImageDraw
+from numba import njit
 
 
+@njit(cache=True, fastmath=True)
 def calculate_iomin(roi, bboxes):
     left_intersect = np.maximum(roi[0], bboxes[:, 0])
     top_intersect = np.maximum(roi[1], bboxes[:, 1])

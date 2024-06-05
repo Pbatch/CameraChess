@@ -30,6 +30,8 @@ class Detector:
         self.model_width = self.inputs.shape[3]
         self.desired_ratio = self.model_height / self.model_width
 
+        self.v10 = "v10" in self.model_basename
+
     def _resize(self, x):
         height, width = x.shape[:2]
         ratio = height / width
@@ -61,10 +63,11 @@ class Detector:
 
     def _fix_bboxes(self, y, roi, padding):
         # xywh -> xyxy
-        y[..., 0] -= y[..., 2] / 2
-        y[..., 1] -= y[..., 3] / 2
-        y[..., 2] += y[..., 0]
-        y[..., 3] += y[..., 1]
+        if not self.v10:
+            y[..., 0] -= y[..., 2] / 2
+            y[..., 1] -= y[..., 3] / 2
+            y[..., 2] += y[..., 0]
+            y[..., 3] += y[..., 1]
 
         # Rescale predictions to original image
         roi_width = roi[2] - roi[0]

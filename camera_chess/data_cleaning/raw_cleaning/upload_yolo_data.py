@@ -3,6 +3,7 @@ import os
 import shutil
 
 import numpy as np
+import yaml
 from imagesize import imagesize
 from tqdm import tqdm
 
@@ -13,10 +14,17 @@ from camera_chess.utils import clear_dir
 
 
 def main():
-    dataset_id = 'final_chess_piece'
+    dataset_id = 'dilanya'
     image_paths = sorted(glob(os.path.join(DATA_DIR, 'roboflow', str(dataset_id), 'images', '*.jpg')))
     clear_dir(STUDIO_IMAGE_DIR)
     clear_dir(STUDIO_LABEL_DIR)
+
+    yaml_path = os.path.join(DATA_DIR, 'roboflow', str(dataset_id), 'data.yaml')
+    if os.path.isfile(yaml_path):
+        with open(yaml_path, 'r') as f:
+            classes = yaml.safe_load(f)["names"]
+    else:
+        classes = CLASSES
 
     for image_path in tqdm(image_paths):
         yolo_path = image_path.replace('images', 'yolov5').replace('.jpg', '.txt')
@@ -60,7 +68,7 @@ def main():
 
         try:
             for class_id, xc, yc, w, h in lines:
-                class_ = CLASSES[int(class_id)]
+                class_ = classes[int(class_id)]
                 xc, yc, w, h = [float(i) for i in [xc, yc, w, h]]
                 x = 100 * (xc - w/2)
                 y = 100 * (yc - h/2)

@@ -100,10 +100,10 @@ def get_roi(keypoints, width, height, model_width, model_height, padding_ratio=1
         target_height = padded_roi_width * desired_ratio
         padding_top += target_height - padded_roi_height
 
-    roi = [int(max(x_min - padding_left, 0)),
-           int(max(y_min - padding_top, 0)),
-           int(min(x_max + padding_right, width)),
-           int(min(y_max + padding_bottom, height))]
+    roi = np.array([int(max(x_min - padding_left, 0)),
+                    int(max(y_min - padding_top, 0)),
+                    int(min(x_max + padding_right, width)),
+                    int(min(y_max + padding_bottom, height))])
     return roi
 
 

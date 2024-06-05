@@ -137,13 +137,14 @@ def main(dataset, model_basename, force_sequence, force_tracker, debug):
     tracker = Tracker(dataset, model_basename=sequence_generator.model_basename)
     tracker.process_sequence(sequence_generator.sequence_path, force=force_tracker)
 
-    # sequence_generator.create_video(tracker.logs_path)
+    if debug:
+        sequence_generator.create_video(tracker.logs_path)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', '-d', type=str, required=True)
-    parser.add_argument('--model_basename', '-m', type=str, default="480S_pieces_480x288.onnx")
+    parser.add_argument('--model_basename', '-m', type=str, default="480S_v10_pieces_480x288.onnx")
     parser.add_argument('--force_sequence', '-fs', action="store_true")
     parser.add_argument('--force_tracker', '-ft', action='store_true')
     parser.add_argument('--debug', action='store_true')

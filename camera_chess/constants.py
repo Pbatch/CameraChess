@@ -82,37 +82,19 @@ SQUARE_TO_PIECE = {**{f'{i}2': 'white-pawn' for i in 'abcdefgh'},
                    'd1': 'white-queen',
                    'e1': 'white-king'}
 
-"""
-Lichess Board API
-"""
-# username = "cameraboard1"
-LICHESS_TOKEN_1 = "lip_mYMY7izVDkuUnIssVYxE"
-
-# username = "cameraboard2"
-LICHESS_TOKEN_2 = "lip_w1lKuk3GbV7eHjo0KFXL"
-
-# username = "tom24008"
-LICHESS_TOKEN_TOM = "lip_qqlkc4ArNe0WuXM7JLxQ"
-
-# username = "blindfoldblunderer"
-LICHESS_TOKEN_PETER = "lip_3Km8pHjYCeNkTRL7HODE"
-
-# username = "babyeatingbishop"
-LICHESS_TOKEN_CONOR = "lip_KHK4q3qAH5TFUfbX83zP"
-
 DATASETS = {
-    'synthetic': ['chesscog',
-                  'chessred2k',
-                  *[os.path.join('chessvision', s) for s in ['test']],
-                  *[os.path.join('roboflow', s) for s in ['7', '9', '10', 'ppp', 'public']],
-                  'google_empty',
-                  ],
+    # 'synthetic': ['chesscog',
+    #               *[os.path.join('chessvision', s) for s in ['test']],
+    #               *[os.path.join('roboflow', s) for s in ['7', '9', '10', 'ppp', 'public', 'dilanya']],
+    #               'google_empty',
+    #               ],
     'val': ['google',
             os.path.join('peter', 'scholars_mate'),
             os.path.join('youtube', 'carlsen_vidit'),
             os.path.join('four_corners', 'caro'),
             os.path.join('mercato', 'english')],
-    'train': [*[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
+    'train': [#'chessred2k',
+              *[os.path.join('youtube', s) for s in ['hikaru_sarin', 'dubov_nepo', 'carlsen_toma', 'shimanov_vidit',
                                                      'harika_nana', 'anand_carlsen', 'gukesh_shakh',
                                                      'karayaman', 'hikaru_vasif', 'magnus_madaminov', 'hari_tuan',
                                                      'hans_rinat', 'retired_lawyer', 'ramirez_yoo']],
@@ -134,7 +116,8 @@ DATASETS = {
               *[os.path.join('seb', s) for s in ['aly_alpha', 'gaspard_alpha', 'gaspard_aly',
                                                  'aly_ulysse', 'ulysse_aly', 'seb_mich', 'jc_seb', 'seb_jc',
                                                  'jc_seb_3', 'seb_jc_3', 'seb_jc_6', 'jc_seb_6']],
-              *[os.path.join('yellowhuus', s) for s in ['2023_01_27']]
+              *[os.path.join('yellowhuus', s) for s in ['2023_01_27']],
+              *[os.path.join('altsalt', s) for s in ['bishop_missed']]
               ]
 }
 EMPTY_DATASETS = {'google_empty'}
