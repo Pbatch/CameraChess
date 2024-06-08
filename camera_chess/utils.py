@@ -32,10 +32,16 @@ def load_video_config(dataset):
 
     roi = d.get('roi', None)
 
+    video_paths = list(glob(os.path.join(dataset_dir, 'video.*')))
+    ext_priority = {'.mov': 1, '.mp4': 2, '.webm': 3}
+    path = max(video_paths,
+               key=lambda x: ext_priority[os.path.splitext(x)[1].lower()]
+               )
+
     video_config_ = video_config(start=d['start'],
                                  end=d['end'],
                                  url=d['url'],
-                                 path=glob(os.path.join(dataset_dir, 'video.*'))[0],
+                                 path=path,
                                  keypoints=keypoints,
                                  fen=d['fen'],
                                  moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')),
