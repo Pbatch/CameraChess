@@ -289,7 +289,7 @@ class SequenceGenerator:
         from_square = None
         to_square = None
         board = chess.Board(self.video_config.fen)
-        for i in tqdm(range(len(sequence)), desc='Writing debug video'):
+        for i in tqdm(range(len(sequence)), desc=f'Writing debug video to {self.video_path}'):
             update_state(state, sequence[i])
 
             if str(i) in logs:
