@@ -82,11 +82,14 @@ class Detector:
 
         return y
 
-    def run(self, image, keypoints):
-        # Crop out region of interest
+    def run(self, image, keypoints=None):
         height, width = image.shape[:2]
-        keypoints_arr = np.array([keypoints[s].tolist() for s in CORNERS])
-        roi = get_roi(keypoints_arr, width, height, self.model_width, self.model_height)
+        if keypoints is not None:
+            # Crop out region of interest
+            keypoints_arr = np.array([keypoints[s].tolist() for s in CORNERS])
+            roi = get_roi(keypoints_arr, width, height, self.model_width, self.model_height)
+        else:
+            roi = [0, 0, width, height]
         image = image[roi[1]:roi[3], roi[0]:roi[2]]
 
         # Resize, pad and scale
@@ -104,4 +107,4 @@ class Detector:
         # Rescale bboxes to match original image size
         y = self._fix_bboxes(y, roi, padding)
 
-        return y
+        return y, roi
