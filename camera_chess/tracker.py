@@ -1,9 +1,11 @@
 import argparse
+import io
 import json
 import os
 
 import chess
 import numpy as np
+from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.constants import CLASSES, DATA_DIR
@@ -74,10 +76,6 @@ class Tracker:
             if joint_score > best_joint_score:
                 best_joint_score = joint_score
                 best_moves = d["moves"]
-            elif joint_score == best_joint_score:
-                print("Error! Two moves have the same joint score")
-                print(f"Candidate ({joint_score:.2f})", d["moves"])
-                print(f"Best moves ({best_joint_score:.2f}) ", best_moves)
 
         return best_score_1, best_score_2, best_joint_score, best_move, best_moves, possible_moves
 
@@ -126,6 +124,36 @@ class Tracker:
 
         with open(self.logs_path, 'w') as f:
             json.dump(logs, f, indent=2)
+
+        pred_pgn = logs[max(logs.keys(), key=lambda x: int(x))]['pgn']
+        pred_moves = [str(move) for move in chess.pgn.read_game(io.StringIO(pred_pgn)).mainline_moves()]
+
+        gt_moves = video_config.moves
+
+        score = 0
+        pred_fail = None
+        gt_fail = None
+        halfmove_fail = -1
+        board = chess.Board()
+        for i in range(len(gt_moves)):
+            pred_move = pred_moves[i] if i < len(pred_moves) else None
+            gt_move = gt_moves[i]
+            if pred_move == gt_move:
+                score += 1
+                board.push(board.parse_uci(gt_move))
+            else:
+                pred_fail = board.san(board.parse_uci(pred_move)) if pred_move is not None else ""
+                gt_fail = board.san(board.parse_uci(gt_move))
+                halfmove_fail = i
+                break
+        score = round(100 * score / len(gt_moves))
+        info = {'score': score,
+                'halfmoves': len(gt_moves),
+                'pred_fail': pred_fail,
+                'gt_fail': gt_fail,
+                'halfmove_fail': halfmove_fail
+                }
+        logger.info(info)
 
         return logs
 
