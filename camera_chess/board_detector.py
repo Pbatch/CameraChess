@@ -141,7 +141,7 @@ class BoardDetector:
                      "a1": np.array([width, 0]),
                      "a8": np.array([width, height]),
                      "h8": np.array([0, height])}
-        pred = torch.tensor(self.model.run(image, keypoints))
+        pred = torch.tensor(self.model.run(image, keypoints)[0])
         boxes = pred[:, :4]
         scores = pred[:, 4]
 
