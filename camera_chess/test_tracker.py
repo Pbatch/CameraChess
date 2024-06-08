@@ -1,18 +1,18 @@
 import argparse
+import datetime as dt
 import io
 import json
 import os
 
 import chess
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from icecream import ic
-import datetime as dt
+from loguru import logger
 
 from camera_chess.constants import DATA_DIR
 from camera_chess.sequence_generator import SequenceGenerator
 from camera_chess.tracker import Tracker
-import matplotlib.pyplot as plt
 
 
 def load_scores(scores_path):
@@ -71,7 +71,9 @@ def create_scores(scores_path, model_basename, force_sequence, force_tracker):
                            'gt_fail': gt_fail,
                            'halfmove_fail': halfmove_fail
                            }
-        ic(dataset, scores[dataset])
+        logger.info(f"{dataset}, {scores[dataset]}")
+
+    scores = dict(sorted(scores.items(), key=lambda x: x[1]["score"]))
 
     with open(scores_path, 'w') as f:
         json.dump(scores, f, indent=2)
@@ -93,6 +95,7 @@ def plot_scores(scores, plot_path):
     title = f'Tracking scores\n{score_string}'
     sns.histplot(data=df, x="score", hue="dataset", multiple="dodge", bins=20).set(title=title)
 
+    logger.info(f"Saving scores to {plot_path}")
     plt.savefig(plot_path)
 
 
