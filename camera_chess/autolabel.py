@@ -4,7 +4,7 @@ from glob import glob
 
 import numpy as np
 from PIL import Image
-from loguru import logger
+from tqdm import tqdm
 
 from camera_chess.board_detector import BoardDetector
 from camera_chess.constants import DATA_DIR, CORNERS, CLASSES
@@ -14,7 +14,7 @@ from camera_chess.video import Video
 
 
 def main(conf_threshold=0.1):
-    detector = Detector(model_basename="480S_v10_pieces_480x288.onnx")
+    detector = Detector(model_basename="640X_v10_pieces_640x448.onnx")
     board_detector = BoardDetector()
 
     autolabel_dir = os.path.join(DATA_DIR, "autolabel")
@@ -25,17 +25,14 @@ def main(conf_threshold=0.1):
 
     video_paths = sorted(glob(os.path.join(DATA_DIR, "autolabel_videos", "*")))
     seen = set()
-    for path in video_paths:
+    for path in tqdm(video_paths):
         config = video_config(start=None, end=None, url=None, path=path, keypoints=None, fen=None, moves=None, roi=None)
         video = Video(video_config=config, target_fps=0.01)
         if video.video_id in seen:
             continue
 
         seen.add(video.video_id)
-        kept = 0
-        total = 0
         for image, frame in video:
-            total += 1
             corners, xcorners = board_detector.find_corners(image)
 
             if xcorners is None:
@@ -72,9 +69,7 @@ def main(conf_threshold=0.1):
             label = {"bboxes": bboxes}
             with open(os.path.join(label_dir, f'{frame_id}.json'), 'w') as f:
                 json.dump(label, f, indent=4)
-            kept += 1
             break
-        logger.info(f"Saved {kept}/{total} images for {path}")
 
 
 if __name__ == '__main__':

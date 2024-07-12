@@ -4,8 +4,8 @@ import subprocess
 def main():
     subprocess.call(['yt-dlp',
                      '-f', 'bv',
-                     '-o', 'data/youtube/%(title)s.%(ext)s',
-                     '-a', 'data/video_urls.txt',
+                     '-o', 'data/autolabel/%(title)s.%(ext)s',
+                     'https://www.youtube.com/playlist?list=UUvM8shKfqDGpepxKPyhOy_Q',
                      '--restrict-filenames'])
 
 

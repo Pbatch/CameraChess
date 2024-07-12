@@ -216,7 +216,7 @@ class SequenceGenerator:
         for i, (image, frame) in tqdm(enumerate(self.video),
                                       desc=f'Creating sequence for {self.dataset}',
                                       total=len(self.video)):
-            preds = detector.run(image, keypoints)
+            preds, _ = detector.run(image, keypoints)
 
             if self.v10:
                 preds = preds[preds[:, 4] > 0.1]
