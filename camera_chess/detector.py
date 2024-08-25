@@ -64,6 +64,7 @@ class Detector:
     def _fix_bboxes(self, y, roi, padding):
         # xywh -> xyxy
         if not self.v10:
+            y = y.T
             y[..., 0] -= y[..., 2] / 2
             y[..., 1] -= y[..., 3] / 2
             y[..., 2] += y[..., 0]

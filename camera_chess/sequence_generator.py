@@ -139,11 +139,11 @@ def process_preds(preds, conf, boundary, centers, frame=0, sequence=None):
 class SequenceGenerator:
     PLOT_SIZE = 64
 
-    def __init__(self, dataset, model_basename):
+    def __init__(self, dataset, model_basename, video_config_path=None):
         self.dataset = dataset
         self.model_basename = model_basename
 
-        self.video_config = load_video_config(self.dataset)
+        self.video_config = load_video_config(self.dataset, video_config_path)
         self.video = Video(self.video_config, target_fps=8)
 
         if self.video_config.keypoints is not None:

@@ -14,7 +14,7 @@ from camera_chess.constants import DATA_DIR, CLASSES, CORNERS
 def load_label_studio():
     samples = []
     keypoint_order = ['h1', 'a1', 'a8', 'h8']
-    for dataset in ['autolabel']:
+    for dataset in [r'nyh\1100_ELO_vs_800_ELO_NYH_Chess']:
         for image_path in glob(os.path.join(DATA_DIR, dataset, 'images', '*')):
             sample = fo.Sample(filepath=image_path)
 
@@ -25,7 +25,6 @@ def load_label_studio():
                 keypoints = [fo.Keypoint(label="board",
                                          points=[label['keypoints'][s] for s in keypoint_order])]
                 sample["keypoints"] = fo.Keypoints(keypoints=keypoints)
-
             detections = [fo.Detection(label=label, bounding_box=bbox)
                           for label, *bbox in label['bboxes']]
             sample["groundtruth"] = fo.Detections(detections=detections)

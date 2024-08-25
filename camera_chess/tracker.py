@@ -15,13 +15,15 @@ from camera_chess.utils import update_state, load_video_config
 
 
 class Tracker:
-    def __init__(self, dataset, model_basename, from_thr=0.6, to_thr=0.6, possible_thr=0.0, decay=0.5):
+    def __init__(self, dataset, model_basename, from_thr=0.6, to_thr=0.6, possible_thr=0.0, decay=0.5,
+                 video_config_path=None):
         self.dataset = dataset
         self.model_basename = model_basename
         self.from_thr = from_thr
         self.to_thr = to_thr
         self.possible_thr = possible_thr
         self.decay = decay
+        self.video_config_path = video_config_path
 
         self.logs_path = os.path.join(DATA_DIR, self.dataset, self.model_basename.split('.')[0], 'logs.json')
 
@@ -88,7 +90,7 @@ class Tracker:
         sequence = np.load(sequence_path)
 
         logs = {}
-        video_config = load_video_config(self.dataset)
+        video_config = load_video_config(self.dataset, self.video_config_path)
         state = np.zeros((64, len(CLASSES)), dtype=np.float32)
         board = chess.Board(video_config.fen)
         pgn = ''
@@ -146,7 +148,8 @@ class Tracker:
                 gt_fail = board.san(board.parse_uci(gt_move))
                 halfmove_fail = i
                 break
-        score = round(100 * score / len(gt_moves))
+        if len(gt_moves):
+            score = round(100 * score / len(gt_moves))
         info = {'score': score,
                 'halfmoves': len(gt_moves),
                 'pred_fail': pred_fail,

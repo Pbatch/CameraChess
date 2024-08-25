@@ -1,15 +1,18 @@
 backup
 data
+nyh
 label_studio
 sparseml
 debug
 blender
 models
-.idea/
 segmentation
 
 *.tar.gz
 *.jpg
 *.png
+
+.idea/
+.venv/
 
 **/__pycache__/

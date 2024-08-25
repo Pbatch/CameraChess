@@ -116,7 +116,9 @@ DATASETS = {
                                                  'aly_ulysse', 'ulysse_aly', 'seb_mich', 'jc_seb', 'seb_jc',
                                                  'jc_seb_3', 'seb_jc_3', 'seb_jc_6', 'jc_seb_6']],
               *[os.path.join('yellowhuus', s) for s in ['2023_01_27']],
-              *[os.path.join('altsalt', s) for s in ['bishop_missed']]
+              *[os.path.join('altsalt', s) for s in ['bishop_missed']],
+              *[os.path.join('nyh', os.path.basename(p))
+                for p in sorted(os.listdir(os.path.join(DATA_DIR, "nyh")))]
               ]
 }
 EMPTY_DATASETS = {'google_empty'}

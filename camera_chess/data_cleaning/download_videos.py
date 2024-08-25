@@ -4,9 +4,10 @@ import subprocess
 def main():
     subprocess.call(['yt-dlp',
                      '-f', 'bv',
-                     '-o', 'data/autolabel/%(title)s.%(ext)s',
+                     '-o', 'nyh/%(title)s.%(ext)s',
                      'https://www.youtube.com/playlist?list=UUvM8shKfqDGpepxKPyhOy_Q',
-                     '--restrict-filenames'])
+                     '--restrict-filenames',
+                     '--match-filter', "duration<300"])
 
 
 if __name__ == '__main__':

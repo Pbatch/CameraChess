@@ -13,10 +13,12 @@ from camera_chess.constants import DATA_DIR, BOARD_SIZE
 video_config = namedtuple("VideoConfig", "start end url path keypoints fen moves roi")
 
 
-def load_video_config(dataset):
-    dataset_dir = os.path.join(DATA_DIR, dataset)
+def load_video_config(dataset, video_config_path=None):
+    if video_config_path is None:
+        video_config_path = os.path.join(DATA_DIR, 'video_config.yaml')
 
-    with open(os.path.join(DATA_DIR, 'video_config.yaml')) as f:
+    dataset_dir = os.path.join(DATA_DIR, dataset)
+    with open(video_config_path) as f:
         config = yaml.safe_load(f)
     d = config[dataset.replace('\\', '/')]
     if 'fen' not in d:
@@ -38,13 +40,19 @@ def load_video_config(dataset):
                key=lambda x: ext_priority[os.path.splitext(x)[1].lower()]
                )
 
+    moves_path = os.path.join(dataset_dir, 'gt.pgn')
+    if os.path.isfile(moves_path):
+        moves = load_moves_from_pgn(moves_path)
+    else:
+        moves = []
+
     video_config_ = video_config(start=d['start'],
                                  end=d['end'],
                                  url=d['url'],
                                  path=path,
                                  keypoints=keypoints,
                                  fen=d['fen'],
-                                 moves=load_moves_from_pgn(os.path.join(dataset_dir, 'gt.pgn')),
+                                 moves=moves,
                                  roi=roi)
 
     return video_config_
