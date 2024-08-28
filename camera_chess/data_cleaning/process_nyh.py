@@ -55,12 +55,19 @@ def process_dataset(dataset):
         }
 
         dets = boxes[boxes[:, 0] == i]
+        seen = set()
         for square, l, t, r, b, cls, conf in dets[:, 1:]:
             square = int(square)
-            piece = None
-            if square != -1:
-                piece = board.piece_at(square)
-            if piece is not None:
+            if square == -1:
+                image[int(t):int(b), int(l):int(r)] = 0
+                continue
+
+            if square in seen:
+                continue
+            seen.add(square)
+
+            piece = board.piece_at(square)
+            if piece is not None and conf < 0.9:
                 cls = PIECE_TO_CLASS[piece]
             else:
                 cls = CLASSES[int(cls)]
@@ -161,7 +168,6 @@ def make_configs():
             print(f"n_keypoints={len(keypoints)}")
             continue
 
-        dataset_key = dataset.replace("\\", "/")
         keypoints = [[int(x * first.width / blend.width), int(y * first.height / blend.height)]
                      for x, y in keypoints]
         end = int(len(vr) / vr.get_avg_fps())
@@ -175,7 +181,7 @@ def write_labels():
     with open(os.path.join(config_path)) as f:
         config = yaml.safe_load(f)
 
-    for path in sorted(glob(os.path.join("nyh/videos/*"))):
+    for path in tqdm(sorted(glob(os.path.join("nyh/videos/*")))):
         dataset, ext = os.path.splitext(path)
         dataset = dataset.replace(".", "").replace("/videos", "")
         dataset_key = dataset.replace("\\", "/")
@@ -192,6 +198,7 @@ def write_labels():
 
 
 def main():
+    # make_configs()
     write_labels()
 
 

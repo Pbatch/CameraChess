@@ -135,8 +135,8 @@ def main(model_width, model_height, debug, single_class):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-mw', '--model_width', type=int, default=640)
-    parser.add_argument('-mh', '--model_height', type=int, default=432)
+    parser.add_argument('-mw', '--model_width', type=int, default=480)
+    parser.add_argument('-mh', '--model_height', type=int, default=288)
     parser.add_argument('-d', '--debug', action='store_true')
     parser.add_argument('-s', '--single_class', action='store_true')
     args = parser.parse_args()

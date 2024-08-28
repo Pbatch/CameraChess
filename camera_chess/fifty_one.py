@@ -14,7 +14,7 @@ from camera_chess.constants import DATA_DIR, CLASSES, CORNERS
 def load_label_studio():
     samples = []
     keypoint_order = ['h1', 'a1', 'a8', 'h8']
-    for dataset in [r'nyh\1100_ELO_vs_800_ELO_NYH_Chess']:
+    for dataset in [r'nyh\Nimrod_824_-_Garami_K_new_NYH_Chess_Rapid']:
         for image_path in glob(os.path.join(DATA_DIR, dataset, 'images', '*')):
             sample = fo.Sample(filepath=image_path)
 

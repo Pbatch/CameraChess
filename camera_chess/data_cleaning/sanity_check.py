@@ -1,3 +1,4 @@
+import json
 import os
 from collections import Counter, defaultdict
 from glob import glob
@@ -5,7 +6,6 @@ from glob import glob
 import numpy as np
 import torch
 import torchvision
-from icecream import ic
 from tqdm import tqdm
 
 from camera_chess.constants import PIECES_DIR, CLASSES
@@ -70,9 +70,9 @@ def main():
             if bbox[2] < 0.01 or bbox[3] < 0.01:
                 bad_labels[root_dataset][id_].append(['small_bbox', bbox.tolist()])
 
-    for root_dataset, d in bad_labels.items():
-        ic(root_dataset)
-        ic(dict(d))
+    bad_labels = dict({k: dict(v) for k, v in bad_labels.items()})
+    with open("bad_labels.json", "w") as f:
+        json.dump(bad_labels, f, indent=2)
 
 
 if __name__ == '__main__':
