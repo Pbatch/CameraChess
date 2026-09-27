@@ -1,0 +1,60 @@
+import argparse
+import json
+import os
+import time
+
+from PIL import Image
+
+from camera_chess.constants import DATA_DIR
+from tqdm import tqdm
+
+
+def main(dataset, export_id):
+    verbose = False
+    with open(os.path.join('label_studio', 'data', 'export', f'{export_id}.json')) as f:
+        labels = json.load(f)
+
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'labels'))
+    os.makedirs(os.path.join(DATA_DIR, dataset, 'images'))
+    for label in tqdm(labels):
+        new_label = {'keypoints': {s: [] for s in ['h1', 'a1', 'a8', 'h8']},
+                     'bboxes': []}
+        basename = os.path.basename(label['data']['img'])
+        position = os.path.splitext(basename)[0]
+
+        for annotation in label['annotations'][0]['result']:
+            value = annotation['value']
+            type_ = annotation['type']
+
+            if type_ == 'keypointlabels':
+                key = value['keypointlabels'][0]
+                x = float(value['x']) / 100
+                y = float(value['y']) / 100
+                new_label['keypoints'][key] = [x, y]
+            elif type_ == 'rectanglelabels':
+                class_ = value['rectanglelabels'][0]
+                bbox = [class_] + [float(value[s]) / 100 for s in ['x', 'y', 'width', 'height']]
+                new_label['bboxes'].append(bbox)
+
+        if all([len(v) == 0 for v in new_label['keypoints'].values()]):
+            new_label.pop('keypoints')
+        new_label_path = f'data/{dataset}/labels/{position}.json'
+        with open(new_label_path, 'w') as f:
+            json.dump(new_label, f, indent=4)
+
+        image = Image.open(os.path.join('label_studio', 'files', 'images', basename))
+        image = image.convert('RGB')
+        new_image_path = f'data/{dataset}/images/{position}.jpg'
+        image.save(new_image_path)
+
+        if verbose:
+            image.show()
+            time.sleep(1)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', '-d', type=str, required=True)
+    parser.add_argument('--export_id', '-e', type=str, required=True)
+    args = parser.parse_args()
+    main(args.dataset, args.export_id)
