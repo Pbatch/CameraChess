@@ -31,10 +31,10 @@ grouped by set, so each `.blend` is opened once per run. The label's
 every FEN on the built-in procedural scene instead.
 
 Written for Blender 5 and tested with Blender 5.2.3. Without a Blender
-install, the project venv's `bpy` wheel (pinned to 5.2.3) works the same way:
+install, the project venv's `bpy` wheel (pinned to 5.2.3, in the `synthetic` group) works the same way:
 
 ```bash
-uv run python camera_chess/synthetic/render.py --fens data/synthetic/fens.txt --out data/synthetic
+uv run --group synthetic python camera_chess/synthetic/render.py --fens data/synthetic/fens.txt --out data/synthetic
 ```
 
 Rendering runs on the GPU (OptiX, CUDA, HIP, oneAPI or Metal), and the script

@@ -21,7 +21,6 @@ seconds. At a rate other than the app's 4 frames a second, the files are chessca
 import argparse
 import gzip
 import json
-import os
 import queue
 import subprocess
 import threading
@@ -32,13 +31,13 @@ import tensorrt as trt
 import torch
 from loguru import logger
 
-from camera_chess.constants import DATA_DIR, MODEL_DIR
+from camera_chess.config import get_config
 from camera_chess.videos.config import load_config, video_path
 
-ONNX_PATH = os.path.join(MODEL_DIR, "chessq-chesscam-dinov3-448.onnx")
+ONNX_PATH = get_config().MODELS_ROOT / "chessq-chesscam-dinov3-448.onnx"
 # The engine takes about a minute to build, so it is kept and reused. It only works on the GPU and TensorRT version
 # it was built with, so it is rebuilt if it fails to load, or if the ONNX model is newer.
-ENGINE_PATH = os.path.join(MODEL_DIR, "chessq-chesscam-dinov3-448.engine")
+ENGINE_PATH = ONNX_PATH.with_suffix(".engine")
 SIZE = 448
 # The app's classes, in the model's output order
 CLASSES = ".PNBRQKpnbrqk"
@@ -59,9 +58,8 @@ def build_engine(onnx_path):
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(0)
     parser = trt.OnnxParser(network, TRT_LOGGER)
-    with open(onnx_path, "rb") as f:
-        if not parser.parse(f.read()):
-            raise RuntimeError([str(parser.get_error(i)) for i in range(parser.num_errors)])
+    if not parser.parse(onnx_path.read_bytes()):
+        raise RuntimeError([str(parser.get_error(i)) for i in range(parser.num_errors)])
     config = builder.create_builder_config()
     config.set_flag(trt.BuilderFlag.FP16)
     config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
@@ -97,14 +95,12 @@ class ChessCamModel:
     def __init__(self, onnx_path=ONNX_PATH, engine_path=ENGINE_PATH):
         runtime = trt.Runtime(TRT_LOGGER)
         engine = None
-        if os.path.isfile(engine_path) and os.path.getmtime(engine_path) >= os.path.getmtime(onnx_path):
-            with open(engine_path, "rb") as f:
-                engine = runtime.deserialize_cuda_engine(f.read())
+        if engine_path.is_file() and engine_path.stat().st_mtime >= onnx_path.stat().st_mtime:
+            engine = runtime.deserialize_cuda_engine(engine_path.read_bytes())
         if engine is None:
             logger.info("Building the TensorRT engine, which takes about a minute")
             serialized = build_engine(onnx_path)
-            with open(engine_path, "wb") as f:
-                f.write(serialized)
+            engine_path.write_bytes(serialized)
             engine = runtime.deserialize_cuda_engine(serialized)
         self.engine = engine
         self.context = engine.create_execution_context()
@@ -170,11 +166,11 @@ def read_frames(path, roi, fps=FPS):
 
 def save(dataset, probs, roi, fps=FPS):
     """Writes a dataset's (frames, 64, 13) probabilities, and what they are, for the replay"""
-    d = os.path.join(DATA_DIR, dataset)
-    with gzip.open(os.path.join(d, f"{probs_name(fps)}.f32.gz"), "wb") as f:
+    d = get_config().DATA_ROOT / dataset
+    with gzip.open(d / f"{probs_name(fps)}.f32.gz", "wb") as f:
         f.write(np.ascontiguousarray(probs, dtype="<f4").tobytes())
     metadata = {
-        "model": os.path.splitext(os.path.basename(ONNX_PATH))[0],
+        "model": ONNX_PATH.stem,
         "shape": list(probs.shape),
         "dtype": "float32, little-endian",
         "fps": fps,
@@ -182,8 +178,7 @@ def save(dataset, probs, roi, fps=FPS):
         "classes": CLASSES,
         "roi": roi,
     }
-    with open(os.path.join(d, f"{probs_name(fps)}.json"), "w") as f:
-        json.dump(metadata, f, indent=2)
+    (d / f"{probs_name(fps)}.json").write_text(json.dumps(metadata, indent=2))
 
 
 def read_batches(path, roi, fps=FPS):

@@ -25,7 +25,6 @@ import torch
 from loguru import logger
 from PIL import Image
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.data import DatasetIncompleteError, DatasetName, get_dataset
 from camera_chess.chessqueries.data.transforms import build_transform
 from camera_chess.chessqueries.metrics import aggregate, aggregate_subsets
@@ -41,6 +40,7 @@ from camera_chess.chessqueries.models.base import predict_all
 from camera_chess.chessqueries.models.checkpoint import load_safetensors_model, read_safetensors_metadata
 from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel
 from camera_chess.chessqueries.train.lit import LitChessQueriesModel
+from camera_chess.config import get_config
 
 
 def _resolution(sample) -> float:

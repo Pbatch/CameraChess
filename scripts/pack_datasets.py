@@ -26,7 +26,8 @@ from loguru import logger
 from PIL import Image
 from tqdm import tqdm
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from camera_chess.config import REPO_ROOT, get_config
+
 # Each dataset's folder under data/; SLCC's also holds its release bundle and source videos.
 # The synthetic renders are the 5k set from camera_chess/synthetic/render.py (data/synthetic holds only its FENs)
 DATASETS = {
@@ -119,7 +120,7 @@ def add_bytes(tar: tarfile.TarFile, name: str, data: bytes, mtime: float) -> Non
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--src", type=Path, default=REPO_ROOT / "data")
+    parser.add_argument("--src", type=Path, default=get_config().DATA_ROOT)
     parser.add_argument(
         "--out",
         type=Path,

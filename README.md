@@ -10,9 +10,17 @@ uv run python -m camera_chess.videos.overlay_moves -d yunker/Br8Y3kCJRCs
 uv run ruff check .
 uv run ty check
 uv run pytest
+uv run pre-commit install  # once: ruff, ty and uv lock --check on each commit
 ```
 
 `onnxruntime-gpu` brings its own CUDA and cuDNN as pip packages, so only an NVIDIA driver is needed for the GPU.
+
+The heaviest dependencies are in groups, so `uv sync` leaves them out; add `--group <name>` (or `--all-groups`) for:
+* `synthetic` - Blender as a module (`bpy`), for `camera_chess/synthetic/`
+* `tensorrt` - TensorRT, for `camera_chess/videos/chesscam_model.py`
+* `chessvision-export` - Ultralytics, to export the ChessVision-3LC weights once
+
+A plain `uv sync` removes groups that aren't asked for, so keep passing them.
 
 Copy `.env.example` to `.env` to put data, checkpoints or outputs on another disk. Datasets live under the
 gitignored `data/`; tests that need one skip when it isn't there.
@@ -25,12 +33,12 @@ gitignored `data/`; tests that need one skip when it isn't there.
   moves from the 2D overlay (`overlay_moves`), running the app's model (`chesscam_model`) and cutting training crops
   (`make_training_data`); `config.py` reads `data/video_config.yaml`
 * `scripts/` - downloading and packing datasets, cross-dataset evaluation, ONNX/LiteRT/TensorRT export, and
-  training on Modal (`uv sync --group modal`; see `scripts/train_chessqueries_modal.py`)
+  training on Modal (see `scripts/train_chessqueries_modal.py`)
 
 ## Licenses
-The ChessQueries code is under `LICENSE.chessqueries` (PolyForm Noncommercial 1.0.0) and its data under
-`DATA_LICENSE.chessqueries` (CC BY-NC 4.0). ChessQ Lite is PolyForm Noncommercial, and the ChessVision-3LC
-weights are AGPL-3.0, so keep them out of anything shipped.
+This repo is under `LICENSE` (PolyForm Noncommercial 1.0.0), the license the ChessQueries code came with
+(`LICENSE.chessqueries`). The ChessQueries data is under `DATA_LICENSE.chessqueries` (CC BY-NC 4.0). ChessQ Lite
+is PolyForm Noncommercial, and the ChessVision-3LC weights are AGPL-3.0, so keep them out of anything shipped.
 
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog

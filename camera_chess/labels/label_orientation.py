@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,7 +20,7 @@ import orjson
 from loguru import logger
 from tqdm import tqdm
 
-from camera_chess.constants import LABELS_DIR
+from camera_chess.config import get_config
 from camera_chess.labels.make_chessqueries_dataset import (
     CLASSES,
     PHOTO_PREFIXES,
@@ -32,7 +31,7 @@ from camera_chess.labels.make_chessqueries_dataset import (
     save_alignments,
 )
 
-ROOT = Path(LABELS_DIR)
+ROOT = get_config().labels_root
 LABELS = ROOT / "orientation_labels.json"
 
 
@@ -120,7 +119,7 @@ class Handler(SimpleHTTPRequestHandler):
         labels = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         tmp = LABELS.with_suffix(".tmp")
         tmp.write_text(json.dumps(labels, indent=1, sort_keys=True))
-        os.replace(tmp, LABELS)
+        tmp.replace(LABELS)
         self._send(b'{"ok": true}')
 
     def log_message(self, format: str, *args) -> None:

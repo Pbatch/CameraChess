@@ -1,6 +1,6 @@
 """Train ChessQueries with Lightning on Modal and export the best model to safetensors.
 
-Needs the local Modal tooling (`uv sync --group modal`), which also lets the launcher check
+Needs the local Modal tooling (the `modal` group, installed by default), which also lets the launcher check
 the settings before submitting. Upload the packed datasets (scripts/pack_datasets.py) once:
 
     .venv/bin/modal volume put chessqueries-training dist/chessqueries-data.tar /datasets/chessqueries-data.tar

@@ -24,7 +24,6 @@ from loguru import logger
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.core import Split
 from camera_chess.chessqueries.data.base import DatasetName, get_dataset
 from camera_chess.chessqueries.data.transforms import Augment, build_transform
@@ -38,6 +37,7 @@ from camera_chess.chessqueries.models.checkpoint import (
 from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel, HeadType
 from camera_chess.chessqueries.train.lit import JointDataModule, LitChessQueriesModel, Schedule
 from camera_chess.chessqueries.train.training_logging import create_wandb_logger
+from camera_chess.config import get_config
 
 Precision = Literal["32-true", "16-mixed", "bf16-mixed"]
 PRECISIONS = set(get_args(Precision))

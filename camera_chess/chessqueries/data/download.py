@@ -7,7 +7,6 @@ visible at their final path only after any available SHA-256 check succeeds.
 from __future__ import annotations
 
 import hashlib
-import os
 import shutil
 import tempfile
 import uuid
@@ -19,9 +18,9 @@ import requests
 from loguru import logger
 from tqdm import tqdm
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.data.base import DatasetName
 from camera_chess.chessqueries.data.inventory import FROZEN_SAMPLE_COUNTS
+from camera_chess.config import get_config
 
 # --- ChessReD (4TU.ResearchData) ------------------------------------------- #
 CHESSRED_ANNOTATIONS_URL = (
@@ -75,7 +74,7 @@ def _prepare_part(dest: Path, expected_sha256: str | None) -> tuple[Path, bool]:
     part = _part_path(dest)
     if dest.exists() and not _ready(dest, expected_sha256):
         part.unlink(missing_ok=True)
-        os.replace(dest, part)
+        dest.replace(part)
         logger.info(f"  [redo] {dest.name} failed validation")
         return part, False
     return part, part.is_file()
@@ -96,7 +95,7 @@ def _finish_part(
             if discard_hash_mismatch:
                 part.unlink()
             raise RuntimeError(f"SHA-256 mismatch for {part} (expected {expected_sha256}, got {actual})")
-    os.replace(part, dest)
+    part.replace(dest)
     return dest
 
 
@@ -161,12 +160,12 @@ def _extract_zip(zip_path: Path, out_dir: Path, expected_root: str) -> None:
             raise _ArchiveValidationError(f"{zip_path} did not contain the expected {expected_root}/ directory")
         if target.exists():
             backup = target.with_name(f".{target.name}.backup-{uuid.uuid4().hex}")
-            os.replace(target, backup)
+            target.replace(backup)
         try:
-            os.replace(extracted, target)
+            extracted.replace(target)
         except Exception:
             if backup is not None and not target.exists():
-                os.replace(backup, target)
+                backup.replace(target)
             raise
         if backup is not None:
             shutil.rmtree(backup)
@@ -253,7 +252,7 @@ def download_chesscog(dataroot: Path | None = None) -> Path:
         if not osfstorage.is_dir():
             raise RuntimeError("OSF clone produced no osfstorage directory")
         for item in osfstorage.iterdir():
-            os.replace(item, render / item.name)
+            item.replace(render / item.name)
     finally:
         shutil.rmtree(clone_stage, ignore_errors=True)
 

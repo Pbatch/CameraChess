@@ -25,7 +25,7 @@ from PIL import Image
 from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 
-from camera_chess.constants import DATA_DIR, LABELS_DIR
+from camera_chess.config import get_config
 
 CLASSES = [
     "black-bishop",
@@ -379,8 +379,8 @@ def load_frame(name: str, split: str, root: Path, anchor_ratio: float, margin: f
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(LABELS_DIR))
-    parser.add_argument("--out", type=Path, default=Path(DATA_DIR) / "chesscam")
+    parser.add_argument("--root", type=Path, default=get_config().labels_root)
+    parser.add_argument("--out", type=Path, default=get_config().DATA_ROOT / "chesscam")
     parser.add_argument(
         "--min-margin",
         type=float,
@@ -390,7 +390,7 @@ def main() -> None:
     parser.add_argument(
         "--predictions",
         type=Path,
-        default=Path(LABELS_DIR) / "chessq_predictions.json",
+        default=get_config().labels_root / "chessq_predictions.json",
         help="ChessQ Lite predictions from predict_chessq.py, used to orient each group",
     )
     parser.add_argument(
@@ -424,13 +424,13 @@ def main() -> None:
     parser.add_argument(
         "--orientation-labels",
         type=Path,
-        default=Path(LABELS_DIR) / "orientation_labels.json",
+        default=get_config().labels_root / "orientation_labels.json",
         help="Hand labels from label_orientation.py, which override the chosen orientation",
     )
     parser.add_argument(
         "--second-opinion",
         type=Path,
-        default=Path(LABELS_DIR) / "chessq_ft_predictions.json",
+        default=get_config().labels_root / "chessq_ft_predictions.json",
         help="Predictions from a model fine-tuned on this dataset, which can keep a group or frame "
         "that --predictions drops, outside the test split (which they would bias)",
     )
@@ -438,7 +438,7 @@ def main() -> None:
         "--label-reviews",
         type=Path,
         nargs="*",
-        default=[Path(LABELS_DIR) / f for f in LABEL_REVIEWS],
+        default=[get_config().labels_root / f for f in LABEL_REVIEWS],
         help='review_test_labels.py verdict files, oldest first; "model right" squares are relabelled',
     )
     args = parser.parse_args()

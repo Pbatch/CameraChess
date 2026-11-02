@@ -19,10 +19,10 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.core import Board, Split
 from camera_chess.chessqueries.data.base import BoardSample, ChessDataset, DatasetName
 from camera_chess.chessqueries.data.inventory import FROZEN_SAMPLE_COUNTS
+from camera_chess.config import get_config
 
 MANIFEST_NAME = "annotations.json"
 

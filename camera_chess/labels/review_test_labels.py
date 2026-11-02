@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -38,7 +37,7 @@ from loguru import logger
 from PIL import Image
 from tqdm import tqdm
 
-from camera_chess.constants import DATA_DIR, LABELS_DIR
+from camera_chess.config import get_config
 from camera_chess.labels.make_chessqueries_dataset import (
     SYMBOLS,
     apply_label_fixes,
@@ -49,8 +48,8 @@ from camera_chess.labels.make_chessqueries_dataset import (
     to_fen,
 )
 
-ROOT = Path(LABELS_DIR)
-DATASET = Path(DATA_DIR) / "chesscam"
+ROOT = get_config().labels_root
+DATASET = get_config().DATA_ROOT / "chesscam"
 PREDICTIONS = ROOT / "test_predictions_lite_ft_chesscam.json"
 VERDICTS = ROOT / "test_label_review.json"
 # The make_chessqueries_dataset.py defaults the dataset was built with
@@ -226,7 +225,7 @@ class Handler(SimpleHTTPRequestHandler):
         verdicts = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         tmp = self.verdicts.with_suffix(".tmp")
         tmp.write_text(json.dumps(verdicts, indent=1, sort_keys=True))
-        os.replace(tmp, self.verdicts)
+        tmp.replace(self.verdicts)
         self._send(b'{"ok": true}')
 
     def log_message(self, format: str, *args) -> None:

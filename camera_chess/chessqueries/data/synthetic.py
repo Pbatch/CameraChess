@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.data.base import DatasetName
 from camera_chess.chessqueries.data.chesscog import ChessCog
+from camera_chess.config import get_config
 
 
 class Synthetic(ChessCog):

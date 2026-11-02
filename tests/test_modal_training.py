@@ -16,8 +16,8 @@ import torch
 pytest.importorskip("modal")
 pytest.importorskip("wandb")
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.train.training_job import ChessQueriesTrainingJob, TrainingConfig
+from camera_chess.config import get_config
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "train_chessqueries_modal.py"
 

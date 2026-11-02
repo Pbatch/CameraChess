@@ -6,10 +6,10 @@ import json
 from enum import Enum
 from pathlib import Path
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.core import Board, Split
 from camera_chess.chessqueries.data.base import BoardSample, ChessDataset, DatasetName
 from camera_chess.chessqueries.data.inventory import FROZEN_SAMPLE_COUNTS
+from camera_chess.config import get_config
 
 VENDORED_LABELS = Path(__file__).parent / "resources" / "cvchess_labels.json"
 VENDORED_VIEWPOINTS = Path(__file__).parent / "resources" / "cvchess_viewpoints.json"

@@ -31,8 +31,8 @@ model_agreement), laid out as ChessQueries' ChessCam dataset. The output folder 
 import argparse
 import gzip
 import json
-import os
 import shutil
+from pathlib import Path
 
 import chess
 import decord
@@ -40,12 +40,12 @@ import numpy as np
 from loguru import logger
 from PIL import Image
 
-from camera_chess.constants import DATA_DIR
+from camera_chess.config import get_config
 from camera_chess.videos.config import load_config, video_path
 
 # Not data/yunker, which holds the source videos: the output folder is deleted and rebuilt on each run
-OUT_DIR = os.path.join(DATA_DIR, "yunker_crops")
-BENCHMARK_PATH = os.path.join(DATA_DIR, "yunker", "benchmark.txt")
+OUT_DIR = get_config().DATA_ROOT / "yunker_crops"
+BENCHMARK_PATH = get_config().DATA_ROOT / "yunker" / "benchmark.txt"
 # The app model's classes, in the order chesscam_probs holds them
 CLASSES = ".PNBRQKpnbrqk"
 # Seconds the board changes after the overlay shows a move (negative: before), from --measure-offset: on 3339 moves of
@@ -76,17 +76,15 @@ JPEG_QUALITY = 95
 
 def load_probs(dataset):
     """(frames, 64, 13) probabilities in FEN order, and what they are (frame rate, region)"""
-    d = os.path.join(DATA_DIR, dataset)
-    with open(os.path.join(d, "chesscam_probs.json")) as f:
-        meta = json.load(f)
-    with gzip.open(os.path.join(d, "chesscam_probs.f32.gz"), "rb") as f:
+    d = get_config().DATA_ROOT / dataset
+    meta = json.loads((d / "chesscam_probs.json").read_text())
+    with gzip.open(d / "chesscam_probs.f32.gz", "rb") as f:
         probs = np.frombuffer(f.read(), "<f4").reshape(-1, 64, len(CLASSES))
     return probs, meta
 
 
 def load_game(dataset):
-    with open(os.path.join(DATA_DIR, dataset, "overlay_moves.json")) as f:
-        games = json.load(f)
+    games = json.loads((get_config().DATA_ROOT / dataset / "overlay_moves.json").read_text())
     if len(games) != 1:
         raise ValueError(f"{dataset} has {len(games)} games; overlay_moves cuts such videos into a dataset per game")
     return games[0]
@@ -181,7 +179,7 @@ def make(dataset, out_dir):
         logger.warning(f"{dataset}: the model disagrees with {dropped} of {total} labels; skipped for a look")
         return []
 
-    reader = decord.VideoReader(video_path(dataset))
+    reader = decord.VideoReader(str(video_path(dataset)))
     fps = reader.get_avg_fps()
     frames = reader.get_batch([min(len(reader) - 1, round(t * fps)) for _, t, _ in kept]).asnumpy()
     height, width = frames.shape[1:3]
@@ -190,10 +188,8 @@ def make(dataset, out_dir):
     name = dataset.replace("/", "_")
     annotations = []
     for (board, t, agreement), frame in zip(kept, frames):
-        image = os.path.join("images", "train", f"{name}_{round(t * 100):06d}.jpg")
-        Image.fromarray(crop(frame, box, config["overlay_roi"])).save(
-            os.path.join(out_dir, image), quality=JPEG_QUALITY
-        )
+        image = f"images/train/{name}_{round(t * 100):06d}.jpg"
+        Image.fromarray(crop(frame, box, config["overlay_roi"])).save(out_dir / image, quality=JPEG_QUALITY)
         annotations.append(
             {
                 "image": image,
@@ -240,16 +236,14 @@ def measure_offset(datasets):
 
 
 def main(datasets, out_dir):
-    with open(BENCHMARK_PATH) as f:
-        benchmark = {f"yunker/{line.strip()}" for line in f if line.strip()}
+    benchmark = {f"yunker/{line.strip()}" for line in BENCHMARK_PATH.read_text().splitlines() if line.strip()}
     if used := [d for d in datasets if d in benchmark or d.split("_game_")[0] in benchmark]:
         raise ValueError(f"{used} are scored by the tracker replay, so must not be trained on")
-    if os.path.exists(out_dir):
+    if out_dir.exists():
         shutil.rmtree(out_dir)
-    os.makedirs(os.path.join(out_dir, "images", "train"))
+    (out_dir / "images" / "train").mkdir(parents=True)
     annotations = [a for dataset in datasets for a in make(dataset, out_dir)]
-    with open(os.path.join(out_dir, "annotations.json"), "w") as f:
-        json.dump(annotations, f, indent=1)
+    (out_dir / "annotations.json").write_text(json.dumps(annotations, indent=1))
     used = len({a["group"] for a in annotations})
     logger.info(f"Wrote {len(annotations)} frames from {used} of {len(datasets)} videos to {out_dir}")
 
@@ -257,7 +251,7 @@ def main(datasets, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", "-d", action="append", required=True)
-    parser.add_argument("--out", default=OUT_DIR)
+    parser.add_argument("--out", type=Path, default=OUT_DIR)
     parser.add_argument("--measure-offset", action="store_true")
     args = parser.parse_args()
     if args.measure_offset:

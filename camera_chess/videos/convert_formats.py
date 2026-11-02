@@ -1,18 +1,14 @@
-import os
 import subprocess
-from glob import glob
 
 from tqdm import tqdm
 
-from camera_chess.constants import DATA_DIR
+from camera_chess.config import get_config
 
 
 def main():
-    for path in tqdm(sorted(glob(os.path.join(DATA_DIR, "*", "*", "*.mov")))):
-        basename = os.path.basename(path)
-        new_basename = f"{os.path.splitext(basename)[0]}.webm"
-        new_path = os.path.join(os.path.dirname(path), new_basename)
-        if os.path.isfile(new_path):
+    for path in tqdm(sorted(get_config().DATA_ROOT.glob("*/*/*.mov"))):
+        new_path = path.with_suffix(".webm")
+        if new_path.is_file():
             continue
         subprocess.run(
             [

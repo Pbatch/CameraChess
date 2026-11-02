@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 from typing import Any
 
 import orjson
 from loguru import logger
 
-from camera_chess.constants import LABELS_DIR
+from camera_chess.config import get_config
 
 CLASS_NAMES = [
     "black-bishop",
@@ -28,10 +27,10 @@ CLASS_NAMES = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a before/after HTML label review.")
-    parser.add_argument("--report", type=Path, default=Path(LABELS_DIR) / "cleanlab_nyh_report.json")
-    parser.add_argument("--backup", type=Path, default=Path(LABELS_DIR) / ".cleanlab/backup")
-    parser.add_argument("--dataset", type=Path, default=Path(LABELS_DIR) / "pieces")
-    parser.add_argument("--output", type=Path, default=Path(LABELS_DIR) / "cleanlab_label_review.html")
+    parser.add_argument("--report", type=Path, default=get_config().labels_root / "cleanlab_nyh_report.json")
+    parser.add_argument("--backup", type=Path, default=get_config().labels_root / ".cleanlab/backup")
+    parser.add_argument("--dataset", type=Path, default=get_config().labels_root / "pieces")
+    parser.add_argument("--output", type=Path, default=get_config().labels_root / "cleanlab_label_review.html")
     return parser.parse_args()
 
 
@@ -45,12 +44,12 @@ def main() -> None:
     cards: list[dict[str, Any]] = []
     for record in report["changes"]:
         # Older reports hold paths relative to the labels folder, newer ones absolute paths
-        image = Path(LABELS_DIR) / record["image"]
-        current_label = Path(LABELS_DIR) / record["label"]
+        image = get_config().labels_root / record["image"]
+        current_label = get_config().labels_root / record["label"]
         backup_label = args.backup / current_label.relative_to(args.dataset)
         cards.append(
             {
-                "image": Path(os.path.relpath(image, args.output.parent)).as_posix(),
+                "image": image.resolve().relative_to(args.output.parent.resolve(), walk_up=True).as_posix(),
                 "name": image.name,
                 "score": record["quality_score"],
                 "before": read_labels(backup_label),

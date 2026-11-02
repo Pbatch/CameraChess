@@ -17,7 +17,6 @@ position comes back, and a video of several games is cut into a dataset per game
 import argparse
 import copy
 import json
-import os
 import subprocess
 
 import chess
@@ -26,7 +25,7 @@ import numpy as np
 import yaml
 from loguru import logger
 
-from camera_chess.constants import DATA_DIR
+from camera_chess.config import get_config
 from camera_chess.videos.chessvision_3lc import SQUARE, SYMBOLS, UNKNOWN, SquareClassifier
 from camera_chess.videos.config import CONFIG_PATH, load_all, load_config, video_path
 
@@ -187,16 +186,15 @@ def cut_video(path, out_path, start, end):
 
 
 def write_game(dataset, game):
-    d = os.path.join(DATA_DIR, dataset)
+    d = get_config().DATA_ROOT / dataset
     pgn = chess.pgn.Game()
     node = pgn
     for _, uci in game["moves"]:
         node = node.add_variation(chess.Move.from_uci(uci))
     pgn.headers["Result"] = node.board().result()
-    with open(os.path.join(d, "gt.pgn"), "w") as f:
-        f.write(str(pgn) + "\n")
-    with open(os.path.join(d, "overlay_moves.json"), "w") as f:
-        json.dump(
+    (d / "gt.pgn").write_text(str(pgn) + "\n")
+    (d / "overlay_moves.json").write_text(
+        json.dumps(
             [
                 {
                     "times": [t for t, _ in game["moves"]],
@@ -204,9 +202,9 @@ def write_game(dataset, game):
                     "end_mismatches": game["end_mismatches"],
                 }
             ],
-            f,
             indent=1,
         )
+    )
 
 
 def write(dataset, games):
@@ -225,15 +223,15 @@ def write(dataset, games):
         part = f"{dataset}_game_{n}"
         start = round(cuts[n - 1], 1)
         end = round(cuts[n], 1) if n < len(games) else None
-        os.makedirs(os.path.join(DATA_DIR, part), exist_ok=True)
+        part_dir = get_config().DATA_ROOT / part
+        part_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Cutting {start}s to {end if end is not None else 'the end'}s of {dataset} into {part}")
-        cut_video(video_path(dataset), os.path.join(DATA_DIR, part, "video.mp4"), start, end)
+        cut_video(video_path(dataset), part_dir / "video.mp4", start, end)
         moves = [(round(t - start, 1), uci) for t, uci in game["moves"]]
         write_game(part, {**game, "moves": moves})
         # A deep copy, as safe_dump writes lists shared between entries as aliases
         config[part] = copy.deepcopy(config[dataset])
-    with open(CONFIG_PATH, "w") as f:
-        yaml.safe_dump(config, f, sort_keys=False)
+    CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False))
 
 
 def main(datasets):

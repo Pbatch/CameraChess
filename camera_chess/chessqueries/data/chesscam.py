@@ -7,9 +7,9 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from camera_chess.chessqueries.config import get_config
 from camera_chess.chessqueries.core import Board, Split
 from camera_chess.chessqueries.data.base import BoardSample, ChessDataset, DatasetName
+from camera_chess.config import get_config
 
 
 class ChessCam(ChessDataset):

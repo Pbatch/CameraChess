@@ -13,7 +13,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.chessqueries.models.predictor import Predictor
-from camera_chess.constants import LABELS_DIR
+from camera_chess.config import get_config
 
 # Kept in step with make_chessqueries_dataset.py, which needs OpenCV rather than torch
 SYMBOLS = "bknpqrBKNPQR"
@@ -30,9 +30,9 @@ def placement_to_labels(placement: str) -> list[int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(LABELS_DIR))
+    parser.add_argument("--root", type=Path, default=get_config().labels_root)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--out", type=Path, default=Path(LABELS_DIR) / "chessq_predictions.json")
+    parser.add_argument("--out", type=Path, default=get_config().labels_root / "chessq_predictions.json")
     parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args()
 

@@ -14,13 +14,12 @@ Export once with: python -m camera_chess.videos.chessvision_3lc path/to/best_yol
 """
 
 import argparse
-import os
 
 from loguru import logger
 
-from camera_chess.constants import MODEL_DIR
+from camera_chess.config import get_config
 
-ONNX_PATH = os.path.join(MODEL_DIR, "chessvision_3lc_board_classifier.onnx")
+ONNX_PATH = get_config().MODELS_ROOT / "chessvision_3lc_board_classifier.onnx"
 # Pixels per square side, as it was trained
 SQUARE = 64
 # Its classes, with 'f' for an empty square
@@ -76,7 +75,7 @@ def export(pt_path):
             labels = torch.where(confidence >= MIN_CONFIDENCE, best, torch.full_like(best, UNKNOWN))
             return labels, probs.clamp(min=MIN_PROBABILITY).log()
 
-    model = YOLO(pt_path).model.float().eval()  # ty: ignore[unresolved-attribute]
+    model = YOLO(pt_path).model.float().eval()
     # The head then returns only the softmax probabilities
     model.model[-1].export = True
     example = torch.zeros(1, 8 * SQUARE, 8 * SQUARE, 3, dtype=torch.uint8)

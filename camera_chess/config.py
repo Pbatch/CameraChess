@@ -9,8 +9,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Repo root = three levels up from this file (camera_chess/chessqueries/config.py -> repo/).
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# Repo root = two levels up from this file (camera_chess/config.py -> repo/).
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     DATA_ROOT: Path = REPO_ROOT / "data"
     CHECKPOINTS_ROOT: Path = REPO_ROOT / "checkpoints"
     OUTPUTS_ROOT: Path = REPO_ROOT / "outputs"
+    # Exported models the video tools run (ONNX and TensorRT engines).
+    MODELS_ROOT: Path = REPO_ROOT / "models"
+
+    @property
+    def labels_root(self) -> Path:
+        # The ChessCam and SLCC labelling work (camera_chess/labels)
+        return self.DATA_ROOT / "labels"
 
     @property
     def chessred_root(self) -> Path:
