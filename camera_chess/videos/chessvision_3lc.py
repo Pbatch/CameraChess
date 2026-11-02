@@ -10,11 +10,13 @@ The exported model takes whole boards and does the pre- and post-processing itse
   output `log_probabilities`: (N, 64, len(SYMBOLS)) float32, floored at log(MIN_PROBABILITY)
 Squares are in python-chess order (a1..h8). The constants below are baked in, so changing any needs a new export.
 
-Export once with: python -m camera_chess.chessvision_3lc path/to/best_yolo_classifier.pt (needs ultralytics)
+Export once with: python -m camera_chess.videos.chessvision_3lc path/to/best_yolo_classifier.pt (needs ultralytics)
 """
 
 import argparse
 import os
+
+from loguru import logger
 
 from camera_chess.constants import MODEL_DIR
 
@@ -88,7 +90,7 @@ def export(pt_path):
         opset_version=17,
         dynamo=False,
     )
-    print(f"Saved {ONNX_PATH}")
+    logger.info(f"Saved {ONNX_PATH}")
 
 
 if __name__ == "__main__":

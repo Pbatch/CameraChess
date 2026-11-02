@@ -29,9 +29,10 @@ import glob
 from pathlib import Path
 
 import torch
+from loguru import logger
 from torch import nn
 from torch.nn import functional as F
-from torchvision.io import ImageReadMode, read_image
+from torchcodec.decoders import decode_image
 
 from camera_chess.chessqueries.models.browser import RGBANormalize, bake_pos_embed
 from camera_chess.chessqueries.models.checkpoint import load_safetensors_model, read_safetensors_metadata
@@ -75,7 +76,7 @@ def store_weights_fp16(path: Path) -> None:
 
 def load_rgba(path: str, resolution: int) -> torch.Tensor:
     """(1, R, R, 4) float32 RGBA, square-resized like the browser's canvas drawImage."""
-    rgb = read_image(path, mode=ImageReadMode.RGB).float()
+    rgb = decode_image(path, mode="RGB").float()
     rgb = F.interpolate(
         rgb[None],
         size=(resolution, resolution),
@@ -109,7 +110,7 @@ def check(model: nn.Module, onnx_path: Path, image_glob: str, resolution: int, l
         board_agree += int(same.all())
         max_diff = max(max_diff, float((expected - actual).abs().max()))
     n = len(paths)
-    print(
+    logger.info(
         f"{n} images: square agreement {square_agree / (64 * n):.4%}, "
         f"board agreement {board_agree / n:.2%}, max |prob diff| {max_diff:.4f}"
     )
@@ -147,7 +148,7 @@ def main() -> None:
         )
     if args.compute == "fp32":
         store_weights_fp16(args.output)
-    print(f"-> {args.output} ({args.output.stat().st_size / 1e6:.1f} MB, {resolution}px, {args.compute} compute)")
+    logger.info(f"-> {args.output} ({args.output.stat().st_size / 1e6:.1f} MB, {resolution}px, {args.compute} compute)")
 
     if args.check_images:
         check(model, args.output, args.check_images, resolution, args.check_limit)

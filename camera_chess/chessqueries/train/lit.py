@@ -10,6 +10,7 @@ from typing import cast
 
 import pytorch_lightning as pl
 import torch
+from loguru import logger
 from pytorch_lightning.utilities.parsing import AttributeDict
 from torch import nn
 from torch.utils.data import ConcatDataset, DataLoader
@@ -282,7 +283,7 @@ class LitChessQueriesModel(_ValMetricsMixin, pl.LightningModule):
                 p.requires_grad = True
             self.model.freeze_encoder = False
             self.model.encoder.train()
-            print(f"[staged-unfreeze] encoder unfrozen at epoch {epoch}")
+            logger.info(f"[staged-unfreeze] encoder unfrozen at epoch {epoch}")
 
     def on_train_epoch_start(self) -> None:
         self._maybe_unfreeze(self.current_epoch)

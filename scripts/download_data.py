@@ -8,6 +8,8 @@ Usage:
 
 import argparse
 
+from loguru import logger
+
 from camera_chess.chessqueries.data import download as dl
 from camera_chess.chessqueries.data.base import DatasetName
 
@@ -26,7 +28,7 @@ def main(argv: list[str] | None = None) -> None:
     for name in names:
         dl.DATASETS[name]()
 
-    print("\nDone.")
+    logger.info("Done.")
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ from urllib.parse import unquote
 import cv2
 import numpy as np
 import orjson
+from loguru import logger
 from PIL import Image
 from tqdm import tqdm
 
@@ -269,7 +270,7 @@ def main() -> None:
     items = build_items(args.chessq_preds, args.chessq_probs, args.min_p_model, args.by_video)
     handler = partial(Handler, items_json=orjson.dumps(items), verdicts=args.verdicts)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    print(f"Reviewing {len(items)} squares at http://127.0.0.1:{args.port} (verdicts in {args.verdicts})")
+    logger.info(f"Reviewing {len(items)} squares at http://127.0.0.1:{args.port} (verdicts in {args.verdicts})")
     server.serve_forever()
 
 

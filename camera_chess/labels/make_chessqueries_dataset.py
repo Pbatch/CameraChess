@@ -20,6 +20,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import orjson
+from loguru import logger
 from PIL import Image
 from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
@@ -306,8 +307,8 @@ _xcorner_review: dict[str, str] = {}
 
 
 def auto_xcorners(name: str, split: str, root: Path) -> np.ndarray | None:
-    """x-corners found by auto_xcorners.py, already in the pieces image's pixels, for videos whose
-    grid was checked and passed in review_xcorners.py"""
+    """x-corners found by the xcorners model (auto_xcorners.py, since removed), already in the pieces
+    image's pixels, for videos whose grid was checked and passed by review"""
     global _auto_xcorners, _xcorner_review
     if _auto_xcorners is None:
         path, review = root / AUTO_XCORNERS, root / XCORNER_REVIEW
@@ -444,10 +445,10 @@ def main() -> None:
     label_fixes = load_label_fixes(args.label_reviews)
     manual = orjson.loads(args.orientation_labels.read_bytes()) if args.orientation_labels.exists() else {}
     predictions = orjson.loads(args.predictions.read_bytes()) if args.predictions.exists() else None
-    print("orienting with", "ChessQ Lite predictions" if predictions else "chess priors")
+    logger.info(f"orienting with {'ChessQ Lite predictions' if predictions else 'chess priors'}")
     second = orjson.loads(args.second_opinion.read_bytes()) if predictions and args.second_opinion.exists() else {}
     if second:
-        print(f"second opinion on dropped train/val frames from {args.second_opinion.name}")
+        logger.info(f"second opinion on dropped train/val frames from {args.second_opinion.name}")
 
     frames: list[Frame] = []
     skipped = defaultdict(int)
@@ -543,8 +544,8 @@ def main() -> None:
     by_split = defaultdict(int)
     for a in annotations:
         by_split[a["split"]] += 1
-    print(f"wrote {len(annotations)} images {dict(by_split)} to {args.out}")
-    print("skipped", dict(skipped))
+    logger.info(f"wrote {len(annotations)} images {dict(by_split)} to {args.out}")
+    logger.info(f"skipped {dict(skipped)}")
     save_alignments(args.root)
 
 

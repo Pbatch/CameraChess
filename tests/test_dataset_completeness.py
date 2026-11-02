@@ -42,7 +42,7 @@ def test_strict_loading_rejects_missing_labelled_images(tmp_path):
         dataset.load_samples(Split.TEST)
 
 
-def test_allow_partial_filters_missing_images_and_reports_counts(tmp_path, capsys):
+def test_allow_partial_filters_missing_images_and_reports_counts(tmp_path, log_messages):
     present = tmp_path / "present.jpg"
     present.write_bytes(b"image")
     dataset = _InventoryDataset([_sample(present, "present"), _sample(tmp_path / "missing.jpg", "missing")])
@@ -65,7 +65,7 @@ def test_allow_partial_filters_missing_images_and_reports_counts(tmp_path, capsy
         "missing_images": 1,
         "structural_issues": [],
     }
-    assert "WARNING [allow_partial]" in capsys.readouterr().out
+    assert any(message.startswith("WARNING [allow_partial]") for message in log_messages)
 
 
 def test_allow_partial_cannot_turn_an_empty_split_into_an_evaluation(tmp_path):

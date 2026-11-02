@@ -12,7 +12,7 @@ TensorRT runs it in FP16, except for the layers that overflow FP16 (see build_en
 agrees with the PyTorch FP32 model on every square, with probabilities within 0.023, at about 5.6 ms a frame on an
 RTX 3060 laptop GPU (CUDA FP32: 12 ms).
 
-Usage: python -m camera_chess.chesscam_model -d yunker/Br8Y3kCJRCs [-d ...] [--fps 8]
+Usage: python -m camera_chess.videos.chesscam_model -d yunker/Br8Y3kCJRCs [-d ...] [--fps 8]
 Writes each dataset's probabilities as raw float32 (frames, 64, 13), gzipped, to chesscam_probs.f32.gz, which Node
 reads with zlib.gunzipSync and a Float32Array, and what they are to chesscam_probs.json. Frame n is at n / fps
 seconds. At a rate other than the app's 4 frames a second, the files are chesscam_probs_<fps>fps.*.
@@ -33,7 +33,7 @@ import torch
 from loguru import logger
 
 from camera_chess.constants import DATA_DIR, MODEL_DIR
-from camera_chess.overlay_moves import load_config, video_path
+from camera_chess.videos.config import load_config, video_path
 
 ONNX_PATH = os.path.join(MODEL_DIR, "chessq-chesscam-dinov3-448.onnx")
 # The engine takes about a minute to build, so it is kept and reused. It only works on the GPU and TensorRT version

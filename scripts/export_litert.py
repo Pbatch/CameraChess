@@ -19,7 +19,7 @@ model before export.
 
 litert-torch pins its own torch, so this runs outside the project venv:
     uv run --no-project --python 3.12 --with litert-torch==0.9.4 --with timm==1.0.27 \
-        --with torchao==0.17.0 --with safetensors --with tflite==2.18.0 python scripts/export_litert.py \
+        --with torchao==0.17.0 --with safetensors --with tflite==2.18.0 --with loguru python scripts/export_litert.py \
         checkpoints/lite-ft-chesscam-v2/lite-ft-chesscam-v2-last.safetensors \
         ../CameraChessWeb/public/chessqueries_lite.tflite
 """
@@ -44,6 +44,7 @@ import tflite
 from ai_edge_litert.interpreter import Interpreter
 from litert_torch.backend.composite import StableHLOCompositeBuilder
 from litert_torch.generative.quantize import quant_recipes
+from loguru import logger
 
 from camera_chess.chessqueries.models.browser import RGBANormalize, bake_pos_embed
 from camera_chess.chessqueries.models.checkpoint import load_safetensors_model, read_safetensors_metadata
@@ -371,7 +372,7 @@ class ChessQueries2D(nn.Module):
         # Sums of squares shrink with the square of the scale
         self.residual_scale = power_of_two_above((max(squares) / FP16_LIMIT) ** 0.5)
         self.score_shrink = shrink
-        print(
+        logger.info(
             f"fp16 ranges: max LayerNorm sum of squares {max(squares):.3g}, residual scale {self.residual_scale:g}, "
             f"score shrink by block {shrink}"
         )
@@ -453,7 +454,7 @@ def build_model(ckpt: Path) -> tuple[BrowserModel, int]:
     rewritten.fit_fp16(model.normalize(sample))
     with torch.no_grad():
         diffs = [float((r - m).abs().max()) for r, m in zip(reference(sample), model(sample))]
-    print(f"2D rewrite: max |prob diff| {diffs[0]:.2e}, max |centroid diff| {diffs[1]:.2e}")
+    logger.info(f"2D rewrite: max |prob diff| {diffs[0]:.2e}, max |centroid diff| {diffs[1]:.2e}")
     assert max(diffs) < 1e-4
     return model, resolution
 
@@ -472,7 +473,7 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     edge.export(str(out))
     set_input_uint8(out)
-    print(f"-> {out} ({out.stat().st_size / 1e6:.1f} MB) in {time.time() - start:.0f}s")
+    logger.info(f"-> {out} ({out.stat().st_size / 1e6:.1f} MB) in {time.time() - start:.0f}s")
 
     with torch.no_grad():
         expected = [t.numpy() for t in model(*sample)]
@@ -485,13 +486,10 @@ def main() -> None:
     # Output order is up to the converter, so match the outputs by shape
     actual = {tuple(d["shape"]): interpreter.get_tensor(d["index"]) for d in interpreter.get_output_details()}
     probs, centroids = actual[expected[0].shape], actual[expected[1].shape]
-    print(
-        "max |prob diff| vs torch:",
-        float(np.abs(expected[0] - probs).max()),
-        "argmax agree:",
-        float((expected[0].argmax(-1) == probs.argmax(-1)).mean()),
-        "max |centroid diff|:",
-        float(np.abs(expected[1] - centroids).max()),
+    logger.info(
+        f"max |prob diff| vs torch: {float(np.abs(expected[0] - probs).max())}, "
+        f"argmax agree: {float((expected[0].argmax(-1) == probs.argmax(-1)).mean())}, "
+        f"max |centroid diff|: {float(np.abs(expected[1] - centroids).max())}"
     )
 
 

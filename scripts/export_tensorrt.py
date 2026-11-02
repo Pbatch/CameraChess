@@ -21,6 +21,7 @@ import argparse
 from pathlib import Path
 
 import torch
+from loguru import logger
 from torch import nn
 from torch.nn import functional as F
 
@@ -67,7 +68,7 @@ def main() -> None:
             output_names=["probs"],
             do_constant_folding=True,
         )
-    print(f"-> {args.output} ({args.output.stat().st_size / 1e6:.1f} MB, {resolution}px, batch {args.batch})")
+    logger.info(f"-> {args.output} ({args.output.stat().st_size / 1e6:.1f} MB, {resolution}px, batch {args.batch})")
 
 
 if __name__ == "__main__":

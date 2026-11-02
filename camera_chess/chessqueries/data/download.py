@@ -16,6 +16,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import requests
+from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.chessqueries.config import get_config
@@ -75,7 +76,7 @@ def _prepare_part(dest: Path, expected_sha256: str | None) -> tuple[Path, bool]:
     if dest.exists() and not _ready(dest, expected_sha256):
         part.unlink(missing_ok=True)
         os.replace(dest, part)
-        print(f"  [redo] {dest.name} failed validation")
+        logger.info(f"  [redo] {dest.name} failed validation")
         return part, False
     return part, part.is_file()
 
@@ -102,10 +103,10 @@ def _finish_part(
 def _download(url: str, dest: Path, expected_sha256: str | None = None) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if _ready(dest, expected_sha256):
-        print(f"  [skip] {dest.name} already present")
+        logger.info(f"  [skip] {dest.name} already present")
         return dest
     part, _ = _prepare_part(dest, expected_sha256)
-    print(f"  [get ] {url}\n     -> {dest}")
+    logger.info(f"  [get ] {url}\n     -> {dest}")
     with requests.get(url, stream=True, timeout=60) as r:
         r.raise_for_status()
         total = int(r.headers.get("content-length", 0))
@@ -125,7 +126,7 @@ def _download_gdrive(file_id: str, dest: Path, expected_sha256: str | None = Non
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     if _ready(dest, expected_sha256):
-        print(f"  [skip] {dest.name} already present")
+        logger.info(f"  [skip] {dest.name} already present")
         return dest
     part, resume = _prepare_part(dest, expected_sha256)
     if not resume:
@@ -147,7 +148,7 @@ def _extract_zip(zip_path: Path, out_dir: Path, expected_root: str) -> None:
     stage = Path(tempfile.mkdtemp(prefix=f".{expected_root}.part-", dir=out_dir))
     target = out_dir / expected_root
     backup: Path | None = None
-    print(f"  [unzip] {zip_path.name} -> {target}")
+    logger.info(f"  [unzip] {zip_path.name} -> {target}")
     try:
         with zipfile.ZipFile(zip_path) as zf:
             corrupt = zf.testzip()
@@ -197,7 +198,7 @@ def download_chessred(dataroot: Path | None = None) -> Path:
     (see CHESSRED_IMAGES_GDRIVE_ID); they extract to ``<dataroot>/images/``.
     """
     dataroot = Path(dataroot) if dataroot else get_config().chessred_root
-    print("ChessReD ->", dataroot)
+    logger.info(f"ChessReD -> {dataroot}")
     _download(
         CHESSRED_ANNOTATIONS_URL,
         dataroot / "annotations.json",
@@ -205,7 +206,7 @@ def download_chessred(dataroot: Path | None = None) -> Path:
     )
     images_dir = dataroot / "images"
     if images_dir.is_dir() and len(list(images_dir.rglob("*.jpg"))) == CHESSRED_IMAGE_COUNT:
-        print("  [skip] images/ already extracted")
+        logger.info("  [skip] images/ already extracted")
     else:
         dataroot.mkdir(parents=True, exist_ok=True)
         zip_path = dataroot / "images_1024.zip"
@@ -234,9 +235,9 @@ def download_chesscog(dataroot: Path | None = None) -> Path:
     dataroot = Path(dataroot) if dataroot else get_config().chesscog_root
     render = dataroot / "render"
     if _chesscog_complete(render):
-        print(f"  [skip] complete ChessCog render already present at {render}")
+        logger.info(f"  [skip] complete ChessCog render already present at {render}")
         return dataroot
-    print("ChessCog (synthetic) ->", render)
+    logger.info(f"ChessCog (synthetic) -> {render}")
 
     # 1. Clone OSF storage away from the final tree, then install its archives.
     render.mkdir(parents=True, exist_ok=True)
@@ -303,11 +304,11 @@ def download_cvchess(dataroot: Path | None = None) -> Path:
     ann = dataroot / "annotations.json"
     if not ann.exists():
         shutil.copy(VENDORED_LABELS, ann)
-        print(f"  [seed] annotations.json -> {ann}")
+        logger.info(f"  [seed] annotations.json -> {ann}")
 
     n_images = len(list(images_dir.glob("*.jpg")))
     if n_images == 0:
-        print(
+        logger.warning(
             "CVChess images must be downloaded manually (Drive folder has >50 files,\n"
             "which defeats gdown). Download from\n"
             f"  https://drive.google.com/drive/folders/{CVCHESS_GDRIVE_FOLDER_ID}\n"
@@ -315,7 +316,7 @@ def download_cvchess(dataroot: Path | None = None) -> Path:
             "Annotations are already in place."
         )
     else:
-        print(f"  [ok] {n_images} images present in {images_dir}")
+        logger.info(f"  [ok] {n_images} images present in {images_dir}")
     return dataroot
 
 

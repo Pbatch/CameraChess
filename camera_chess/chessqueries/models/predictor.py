@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import torch
-from torchvision.io import ImageReadMode, read_image
+from torchcodec.decoders import decode_image
 
 from camera_chess.chessqueries.core import Board
 from camera_chess.chessqueries.data.transforms import build_transform
@@ -104,4 +104,4 @@ class Predictor:
 
     def _load(self, path: Path) -> torch.Tensor:
         # RGB mode drops alpha and expands grayscale: uploads are not dataset images.
-        return self._transform(read_image(str(path), mode=ImageReadMode.RGB).float())
+        return self._transform(decode_image(path, mode="RGB").float())

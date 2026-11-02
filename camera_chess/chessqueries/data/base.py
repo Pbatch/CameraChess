@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import ClassVar
 
 import torch
+from loguru import logger
 from torch.utils.data import Dataset
-from torchvision.io import ImageReadMode, read_image
+from torchcodec.decoders import decode_image
 
 from camera_chess.chessqueries.core import Board, Split
 
@@ -130,9 +131,9 @@ class BoardImageDataset(Dataset):
     def __getitem__(self, index: int):
         sample = self.samples[index]
         if self.uint8:
-            img = read_image(str(sample.image_path), mode=ImageReadMode.RGB)
+            img = decode_image(sample.image_path, mode="RGB")
         else:
-            img = read_image(str(sample.image_path)).float()
+            img = decode_image(sample.image_path, mode="UNCHANGED").float()
         if self.transform is not None:
             img = self.transform(img)
         return img, torch.tensor(sample.board.labels, dtype=torch.long)
@@ -205,9 +206,8 @@ class ChessDataset(ABC):
                 "Pass allow_partial=True only for a diagnostic subset."
             )
         if completeness.partial:
-            print(
-                f"WARNING [allow_partial] {self.name.value}[{split_name}]: {detail}; "
-                "paper-comparable evaluation is disabled"
+            logger.warning(
+                f"[allow_partial] {self.name.value}[{split_name}]: {detail}; paper-comparable evaluation is disabled"
             )
         return DatasetLoad(available, completeness)
 

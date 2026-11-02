@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import orjson
+from loguru import logger
 
 from camera_chess.constants import LABELS_DIR
 
@@ -65,7 +66,7 @@ def main() -> None:
     data = orjson.dumps({"classes": CLASS_NAMES, "cards": cards}).decode().replace("</", "<\\/")
     html = HTML.replace("__REVIEW_DATA__", data)
     args.output.write_text(html)
-    print(f"Wrote {args.output} with {len(cards)} before/after comparisons")
+    logger.info(f"Wrote {args.output} with {len(cards)} before/after comparisons")
 
 
 HTML = """<!doctype html>

@@ -3,7 +3,7 @@
 `roi` is the 3D board and `overlay_roi` is the 2D board drawn over the video, both [x, y, width, height]
 in video pixels. A video can instead be marked `unusable: true`, e.g. when the board can't be seen.
 
-Usage: python -m camera_chess.roi_labeller [--port 8000], then open http://localhost:8000
+Usage: python -m camera_chess.videos.roi_labeller [--port 8000], then open http://localhost:8000
 """
 
 import argparse
@@ -18,22 +18,15 @@ import yaml
 from loguru import logger
 
 from camera_chess.constants import DATA_DIR
+from camera_chess.videos.config import CONFIG_PATH, load_all
 
-CONFIG_PATH = os.path.join(DATA_DIR, "video_config.yaml")
 PAGE_PATH = os.path.join(os.path.dirname(__file__), "roi_labeller.html")
 ROI_KEYS = ("roi", "overlay_roi")
 
 
-def load_config():
-    if not os.path.isfile(CONFIG_PATH):
-        return {}
-    with open(CONFIG_PATH) as f:
-        return yaml.safe_load(f) or {}
-
-
 def find_videos():
     """Datasets are the folders, two deep under data, that hold a video, e.g. yunker/Br8Y3kCJRCs"""
-    config = load_config()
+    config = load_all()
     videos = []
     for path in sorted(glob(os.path.join(DATA_DIR, "*", "*", "video.*"))):
         if path.endswith(".json"):
@@ -58,9 +51,8 @@ def find_videos():
 
 
 def save_labels(dataset, labels):
-    config = load_config()
-    # load_video_config needs start and end, which null leaves as the whole video
-    d = config.setdefault(dataset, {"start": None, "end": None})
+    config = load_all()
+    d = config.setdefault(dataset, {})
     for k in ROI_KEYS:
         if labels.get(k) is not None:
             d[k] = [round(v) for v in labels[k]]

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import chess
 import chess.pgn
+from loguru import logger
 
 
 def main() -> None:
@@ -51,7 +52,7 @@ def main() -> None:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("".join(f + "\n" for f in fens))
-    print(f"wrote {len(fens)} positions to {args.out}")
+    logger.info(f"wrote {len(fens)} positions to {args.out}")
 
 
 if __name__ == "__main__":

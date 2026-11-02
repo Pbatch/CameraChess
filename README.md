@@ -6,7 +6,7 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/), on Python 3.13 (
 
 ```bash
 uv sync
-uv run python -m camera_chess.overlay_moves -d yunker/Br8Y3kCJRCs
+uv run python -m camera_chess.videos.overlay_moves -d yunker/Br8Y3kCJRCs
 uv run ruff check .
 uv run ty check
 uv run pytest
@@ -21,8 +21,9 @@ gitignored `data/`; tests that need one skip when it isn't there.
 * `camera_chess/chessqueries/` - ChessQueries: datasets, model, metrics and Lightning training
 * `camera_chess/labels/` - building and reviewing the ChessCam and SLCC labels
 * `camera_chess/synthetic/` - synthetic boards rendered with Blender (`bpy`), see its README
-* `camera_chess/` - video tools and the model wrappers they run (`chessqueries_detector`, `chesscam_model`,
-  `chessvision_3lc`), alongside the older YOLO detector and move tracker
+* `camera_chess/videos/` - recorded games: downloading, drawing board regions (`roi_labeller`), reading the true
+  moves from the 2D overlay (`overlay_moves`), running the app's model (`chesscam_model`) and cutting training crops
+  (`make_training_data`); `config.py` reads `data/video_config.yaml`
 * `scripts/` - downloading and packing datasets, cross-dataset evaluation, ONNX/LiteRT/TensorRT export, and
   training on Modal (`uv sync --group modal`; see `scripts/train_chessqueries_modal.py`)
 

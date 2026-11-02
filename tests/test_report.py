@@ -79,9 +79,9 @@ def test_write_eval_outputs_rejects_duplicate_ids_before_writing(tmp_path):
     assert not out.exists()
 
 
-def test_print_metrics_formats_floats_and_ints(capsys):
+def test_print_metrics_formats_floats_and_ints(log_messages):
     print_metrics({"board_accuracy": 0.5, "n_boards": 3}, "header")
-    out = capsys.readouterr().out
+    out = "".join(log_messages)
     assert "=== header ===" in out
     assert "0.5000" in out and " 3" in out
 

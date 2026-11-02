@@ -8,7 +8,6 @@ dependencies = [
     # Blender as a module, for the synthetic renderer (camera_chess/synthetic/render.py); needs Python 3.13
     "bpy==5.2.3",
     "chess==1.11.2",
-    "cleanlab==2.9.0",
     "eva-decord==0.6.1",
     "gdown==5.2.2",
     "loguru==0.7.3",
@@ -35,13 +34,14 @@ dependencies = [
     "tensorrt-cu13>=10,<11",
     "timm==1.0.30",
     "torch==2.15.0",
+    "torchcodec==0.17.0",
     "torchvision==0.29.2",
     "tqdm==4.70.1",
     "ultralytics==8.4.197",
 ]
 
 [tool.uv]
-# Scripts run as modules from the repo root, e.g. python -m camera_chess.overlay_moves, so it is not installed
+# Scripts run as modules from the repo root, e.g. python -m camera_chess.videos.overlay_moves, so it is not installed
 package = false
 environments = ["sys_platform == 'linux'"]
 

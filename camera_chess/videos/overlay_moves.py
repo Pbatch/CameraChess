@@ -1,15 +1,15 @@
 """Reads a game's moves from the 2D board some videos draw over the camera view, for use as ground truth.
 
 Each video needs `overlay_roi` ([x, y, width, height] of the 2D board, white at the bottom) in video_config.yaml,
-which camera_chess.roi_labeller draws. Each frame's squares are read by ChessVision-3LC's square classifier (see
-camera_chess.chessvision_3lc). The game is followed by accepting the legal move (or pair of moves) that best explains
+which camera_chess.videos.roi_labeller draws. Each frame's squares are read by ChessVision-3LC's square classifier (see
+camera_chess.videos.chessvision_3lc). The game is followed by accepting the legal move (or pair of moves) that best explains
 the overlay, by the summed log-probability of every square, for several frames in a row. Scoring with probabilities,
 not hard labels, stops one confidently misread piece from picking the wrong move.
 
 Only frames that a reachable position explains are used: the current one, one or two legal moves on, or the start
 position. Anything else, such as the camera view or the wall once the overlay is taken away, is ignored.
 
-Usage: python -m camera_chess.overlay_moves -d yunker/Br8Y3kCJRCs [-d ...]
+Usage: python -m camera_chess.videos.overlay_moves -d yunker/Br8Y3kCJRCs [-d ...]
 Writes gt.pgn and overlay_moves.json (with each move's time) to the dataset. A new game starts whenever the start
 position comes back, and a video of several games is cut into a dataset per game, `<dataset>_game_N` (see write).
 """
@@ -26,8 +26,9 @@ import numpy as np
 import yaml
 from loguru import logger
 
-from camera_chess.chessvision_3lc import SQUARE, SYMBOLS, UNKNOWN, SquareClassifier
 from camera_chess.constants import DATA_DIR
+from camera_chess.videos.chessvision_3lc import SQUARE, SYMBOLS, UNKNOWN, SquareClassifier
+from camera_chess.videos.config import CONFIG_PATH, load_all, load_config, video_path
 
 SIZE = 8 * SQUARE
 # Frames read per second of video
@@ -45,16 +46,6 @@ START_MISMATCHES = 2
 # Seconds a game's part of a video starts before its start position is seen, as the overlay can be hidden while the
 # board is set up and only come back as the first move is played
 LEAD_IN = 3.0
-
-
-def load_config(dataset):
-    with open(os.path.join(DATA_DIR, "video_config.yaml")) as f:
-        return yaml.safe_load(f)[dataset]
-
-
-def video_path(dataset):
-    d = os.path.join(DATA_DIR, dataset)
-    return os.path.join(d, next(p for p in sorted(os.listdir(d)) if p.startswith("video.") and not p.endswith(".json")))
 
 
 def read_frames(path, roi):
@@ -221,14 +212,12 @@ def write_game(dataset, game):
 def write(dataset, games):
     """Writes gt.pgn and overlay_moves.json to the dataset. A video of several games is instead cut into a dataset per
     game, `<dataset>_game_N`, from LEAD_IN before its start position is first seen (but after the last game's last
-    move) to where the next part starts, with its times from the cut and its own entry in video_config.yaml, as the
-    tracker follows one game from the video's start."""
+    move) to where the next part starts, with its times from the cut and its own entry in video_config.yaml, so each
+    dataset is one game from its video's start."""
     if len(games) == 1:
         write_game(dataset, games[0])
         return
-    config_path = os.path.join(DATA_DIR, "video_config.yaml")
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+    config = load_all()
     cuts = [
         max(game["start"] - LEAD_IN, prev["moves"][-1][0] if prev else 0) for prev, game in zip([None, *games], games)
     ]
@@ -243,7 +232,7 @@ def write(dataset, games):
         write_game(part, {**game, "moves": moves})
         # A deep copy, as safe_dump writes lists shared between entries as aliases
         config[part] = copy.deepcopy(config[dataset])
-    with open(config_path, "w") as f:
+    with open(CONFIG_PATH, "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
 

@@ -2,9 +2,9 @@
 with the position the overlay shows at that moment.
 
 Each dataset needs, from the usual steps:
-  `roi` and `overlay_roi` in video_config.yaml (camera_chess.roi_labeller)
-  overlay_moves.json, the true moves and their times (camera_chess.overlay_moves)
-  chesscam_probs.f32.gz and .json, the app's model on every frame (camera_chess.chesscam_model), to catch bad labels
+  `roi` and `overlay_roi` in video_config.yaml (camera_chess.videos.roi_labeller)
+  overlay_moves.json, the true moves and their times (camera_chess.videos.overlay_moves)
+  chesscam_probs.f32.gz and .json, the app's model on every frame (camera_chess.videos.chesscam_model), to catch bad labels
 
 Frames are taken between moves, never from just before a move to just after it, when a piece is in the air or in a
 hand and the board is neither position. Hands over the board are kept: what they hide is still on the board. Each
@@ -22,8 +22,8 @@ of it still inside a crop (where it overlaps the board region itself) is blacked
 
 The games scored by the tracker replay in CameraChessWeb (data/yunker/benchmark.txt) are never used.
 
-Usage: python -m camera_chess.make_training_data -d yunker/D81hFXZ0Cp4 [-d ...] [--out data/yunker_crops]
-       python -m camera_chess.make_training_data --measure-offset -d yunker/LEYxdEWJXCg [-d ...]
+Usage: python -m camera_chess.videos.make_training_data -d yunker/D81hFXZ0Cp4 [-d ...] [--out data/yunker_crops]
+       python -m camera_chess.videos.make_training_data --measure-offset -d yunker/LEYxdEWJXCg [-d ...]
 Writes the crops to <out>/images/train/ and annotations.json (image, fen, split, group, box, time,
 model_agreement), laid out as ChessQueries' ChessCam dataset. The output folder is rebuilt from scratch on each run.
 """
@@ -41,7 +41,7 @@ from loguru import logger
 from PIL import Image
 
 from camera_chess.constants import DATA_DIR
-from camera_chess.overlay_moves import load_config, video_path
+from camera_chess.videos.config import load_config, video_path
 
 # Not data/yunker, which holds the source videos: the output folder is deleted and rebuilt on each run
 OUT_DIR = os.path.join(DATA_DIR, "yunker_crops")
@@ -163,7 +163,7 @@ def make(dataset, out_dir):
     probs, meta = load_probs(dataset)
     probs_fps = meta["fps"]
     if config["roi"] != meta["roi"]:
-        raise ValueError(f"{dataset}'s chesscam_probs are for another region; rerun camera_chess.chesscam_model")
+        raise ValueError(f"{dataset}'s chesscam_probs are for another region; rerun camera_chess.videos.chesscam_model")
     if game.get("end_mismatches", 0) > END_MISMATCHES:
         logger.warning(f"{dataset}: the overlay's last position disagrees with the moves read; skipped")
         return []

@@ -18,6 +18,7 @@ from urllib.parse import unquote
 
 import numpy as np
 import orjson
+from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.constants import LABELS_DIR
@@ -133,7 +134,7 @@ def main() -> None:
     predictions = orjson.loads((ROOT / "chessq_predictions.json").read_bytes())
     items_json = orjson.dumps(build_items(predictions))
     server = ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, items_json=items_json))
-    print(f"Labelling at http://127.0.0.1:{args.port} (labels in {LABELS})")
+    logger.info(f"Labelling at http://127.0.0.1:{args.port} (labels in {LABELS})")
     server.serve_forever()
 
 

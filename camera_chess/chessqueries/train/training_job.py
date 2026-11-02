@@ -20,6 +20,7 @@ from typing import Literal, cast, get_args
 
 import pytorch_lightning as pl
 import torch
+from loguru import logger
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 
@@ -165,7 +166,7 @@ def evaluate_on_test(model: ChessQueriesModel, config: TrainingConfig) -> dict[s
             )
         metrics = aggregate(predictions.preds, predictions.gts)
         results[name.value] = {key: metrics[key] for key in ("n_boards", "board_accuracy", "per_square_accuracy")}
-        print(name.value, results[name.value])
+        logger.info(f"{name.value} {results[name.value]}")
     return results
 
 

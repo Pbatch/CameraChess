@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from loguru import logger
+
 from camera_chess.chessqueries.core import Split
 from camera_chess.chessqueries.data.base import BoardSample, ChessDataset, DatasetCompleteness
 
@@ -26,9 +28,8 @@ def resolve_split(ds_obj: ChessDataset, split_arg: str | None) -> Split | None:
 
 
 def print_metrics(metrics: dict, header: str) -> None:
-    print(f"\n=== {header} ===")
-    for k, v in metrics.items():
-        print(f"  {k:32s} {v:.4f}" if isinstance(v, float) else f"  {k:32s} {v}")
+    rows = (f"  {k:32s} {v:.4f}" if isinstance(v, float) else f"  {k:32s} {v}" for k, v in metrics.items())
+    logger.info("\n".join([f"=== {header} ===", *rows]))
 
 
 def evaluation_inventory(
@@ -52,7 +53,7 @@ def print_evaluation_inventory(inventory: dict) -> None:
     paper_comparable = inventory["mode"] == "strict" and inventory["actual_samples"] == inventory["expected_samples"]
     status = "PAPER-COMPARABLE" if paper_comparable else "NON-PAPER"
     scope = inventory["scope"].replace("_", " ").upper()
-    print(
+    logger.info(
         f"data {dataset}[{split}] [{mode}; {scope}; {status}]: "
         f"expected={inventory['expected_samples']}  "
         f"labelled={inventory['labelled_samples']}  "

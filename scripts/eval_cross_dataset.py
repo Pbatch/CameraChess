@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import torch
+from loguru import logger
 from PIL import Image
 
 from camera_chess.chessqueries.config import get_config
@@ -184,7 +185,7 @@ def main() -> None:
             "subsets": breakdown["subsets"],
         }
         cuts = ", ".join(f"{t:.0f}" for t in thresholds)
-        print(f"\n--- by {args.subset_by} (cuts={cuts}) | {_quantiles(values)} ---")
+        logger.info(f"--- by {args.subset_by} (cuts={cuts}) | {_quantiles(values)} ---")
         for band in banding.band_order:
             m = breakdown["subsets"].get(band)
             line = (
@@ -192,14 +193,14 @@ def main() -> None:
                 if m
                 else "(empty)"
             )
-            print(f"  {band:6s} {line}")
+            logger.info(f"  {band:6s} {line}")
 
     metrics["evaluation"] = inventory
     suffix = eval_tag(args.dataset.value, split)
     out_dir = write_eval_outputs(
         cfg.OUTPUTS_ROOT / f"chessqueries_{args.name}", suffix, metrics, ds.samples, predicted.preds
     )
-    print(f"\nWrote metrics + predictions to {out_dir} ({suffix})")
+    logger.info(f"Wrote metrics + predictions to {out_dir} ({suffix})")
 
 
 if __name__ == "__main__":

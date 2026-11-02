@@ -22,6 +22,7 @@ import tarfile
 from multiprocessing import Pool
 from pathlib import Path
 
+from loguru import logger
 from PIL import Image
 from tqdm import tqdm
 
@@ -161,7 +162,7 @@ def main() -> None:
     partial.replace(tar_path)
     digest = out.digest.hexdigest()
     (tar_path.parent / f"{tar_path.name}.sha256").write_text(f"{digest}  {tar_path.name}\n")
-    print(f"{len(jobs)} images -> {tar_path} ({tar_path.stat().st_size / 2**30:.2f} GiB), sha256 {digest}")
+    logger.info(f"{len(jobs)} images -> {tar_path} ({tar_path.stat().st_size / 2**30:.2f} GiB), sha256 {digest}")
 
 
 if __name__ == "__main__":

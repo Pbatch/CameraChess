@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import modal
+from loguru import logger
 
 app = modal.App("chessqueries-training")
 volume = modal.Volume.from_name("chessqueries-training", create_if_missing=True)
@@ -35,6 +36,7 @@ volume = modal.Volume.from_name("chessqueries-training", create_if_missing=True)
 PYTHON_VERSION = "3.13"
 TRAINING_PACKAGES = (
     "torch==2.15.0",
+    "torchcodec==0.17.0",
     "torchvision==0.29.2",
     "timm==1.0.30",
     "pytorch-lightning==2.6.6",
@@ -48,6 +50,7 @@ TRAINING_PACKAGES = (
     "pydantic==2.14.2",
     "pydantic-settings==2.16.2",
     "python-dotenv==1.2.4",
+    "loguru==0.7.3",
 )
 image = (
     modal.Image.debian_slim(python_version=PYTHON_VERSION)
@@ -139,9 +142,9 @@ def main(
     trainer = ModalChessQueriesTrainer.with_options(gpu=gpu)()  # ty: ignore[unresolved-attribute]
     call = (trainer.evaluate if evaluate_only else trainer.train).spawn(config)
     dashboard_url = app.get_dashboard_url()
-    print(f"Submitted training run: {run_name}")
-    print(f"Modal call ID: {call.object_id}")
-    print(f"View run: {dashboard_url}")
+    logger.info(f"Submitted training run: {run_name}")
+    logger.info(f"Modal call ID: {call.object_id}")
+    logger.info(f"View run: {dashboard_url}")
     submission = {
         "submitted_at": datetime.now(UTC).isoformat(),
         "app_id": app.app_id,
@@ -153,4 +156,4 @@ def main(
     }
     submission_path = submission_dir / f"{call.object_id}.json"
     submission_path.write_text(json.dumps(submission, indent=2) + "\n")
-    print(f"Submission saved: {submission_path}")
+    logger.info(f"Submission saved: {submission_path}")

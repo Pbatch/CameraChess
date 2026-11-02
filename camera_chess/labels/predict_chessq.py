@@ -9,6 +9,7 @@ import argparse
 import json
 from pathlib import Path
 
+from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.chessqueries.models.predictor import Predictor
@@ -54,7 +55,7 @@ def main() -> None:
         for path, pred in zip(batch, predictor.predict(batch, batch_size=args.batch_size)):
             predictions[path.stem] = placement_to_labels(pred.board.placement)
     args.out.write_text(json.dumps(predictions))
-    print(f"{len(predictions)} predictions in {args.out}")
+    logger.info(f"{len(predictions)} predictions in {args.out}")
 
 
 if __name__ == "__main__":
