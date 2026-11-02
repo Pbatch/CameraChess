@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corner Review</title>
+<style>
+  :root { --bg: #16181d; --panel: #20232a; --text: #e8e8ea; --muted: #9a9ca3; --ok: #4cc38a; --bad: #e5484d; --grid: #ffd23f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; gap: 16px; align-items: center; padding: 10px 16px; background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; }
+  .progress { flex: 1; min-width: 160px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+  .progress div { height: 100%; background: var(--ok); width: 0; }
+  main { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .frames { display: flex; gap: 12px; flex-wrap: wrap; }
+  .frames figure { margin: 0; }
+  .frames figcaption { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  canvas { max-width: 100%; border-radius: 6px; background: #000; display: block; }
+  .bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; background: var(--panel); padding: 10px 12px; border-radius: 6px; }
+  .name { font-family: ui-monospace, monospace; word-break: break-all; }
+  .state { font-weight: 600; }
+  .state.ok { color: var(--ok); }
+  .state.bad { color: var(--bad); }
+  kbd { background: #333; border-radius: 3px; padding: 1px 5px; font-family: ui-monospace, monospace; }
+  #saved { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Does the grid sit on the board's squares in both frames?</h1>
+  <div class="progress"><div id="bar"></div></div>
+  <span id="count"></span>
+  <span id="saved"></span>
+</header>
+<main>
+  <div class="bar">
+    <span class="name" id="name"></span>
+    <span class="state" id="state"></span>
+    <span><kbd>A</kbd> grid is right · <kbd>S</kbd> grid is wrong · <kbd>←</kbd> <kbd>→</kbd> prev / next · <kbd>U</kbd> next unreviewed · <kbd>Backspace</kbd> clear</span>
+  </div>
+  <div class="frames" id="frames"></div>
+</main>
+<script>
+let items = [], review = {}, i = 0;
+
+function project(inv, u, v, scale) {
+  const x = inv[0][0] * u + inv[0][1] * v + inv[0][2];
+  const y = inv[1][0] * u + inv[1][1] * v + inv[1][2];
+  const w = inv[2][0] * u + inv[2][1] * v + inv[2][2];
+  return [x / w * scale, y / w * scale];
+}
+
+function drawFrame(canvas, img, inv) {
+  const scale = Math.min(2, (window.innerWidth - 60) / 2 / img.width);
+  canvas.width = img.width * scale;
+  canvas.height = img.height * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--grid');
+  for (let t = -1; t <= 7; t++) {
+    ctx.lineWidth = t === -1 || t === 7 ? 2.5 : 1;
+    for (const [a, b] of [[[t, -1], [t, 7]], [[-1, t], [7, t]]]) {
+      ctx.beginPath();
+      ctx.moveTo(...project(inv, ...a, scale));
+      ctx.lineTo(...project(inv, ...b, scale));
+      ctx.stroke();
+    }
+  }
+}
+
+function render() {
+  const item = items[i];
+  const frames = document.getElementById('frames');
+  frames.innerHTML = '';
+  item.shown.forEach((f, j) => {
+    const fig = document.createElement('figure');
+    const canvas = document.createElement('canvas');
+    const cap = document.createElement('figcaption');
+    cap.textContent = item.shown.length === 1 ? 'only frame' : j === 0 ? 'first frame' : 'last frame';
+    fig.append(canvas, cap);
+    frames.append(fig);
+    const img = new Image();
+    img.onload = () => drawFrame(canvas, img, f.inv);
+    img.src = f.image;
+  });
+  const v = review[item.video];
+  const state = document.getElementById('state');
+  state.textContent = v === undefined ? 'Unreviewed' : v === 'ok' ? 'Grid right' : 'Grid wrong';
+  state.className = 'state ' + (v || '');
+  document.getElementById('name').textContent = `${i + 1}/${items.length} · ${item.video} · ${item.frames} frames`;
+  const done = items.filter(it => it.video in review).length;
+  document.getElementById('count').textContent = `${done} reviewed`;
+  document.getElementById('bar').style.width = `${100 * done / items.length}%`;
+}
+
+function show(j) {
+  i = Math.max(0, Math.min(items.length - 1, j));
+  render();
+}
+
+function nextUnreviewed() {
+  for (let j = 1; j <= items.length; j++) {
+    const n = (i + j) % items.length;
+    if (!(items[n].video in review)) return show(n);
+  }
+  show(i);
+}
+
+async function save() {
+  document.getElementById('saved').textContent = 'Saving…';
+  try {
+    const r = await fetch('review', { method: 'POST', body: JSON.stringify(review) });
+    document.getElementById('saved').textContent = r.ok ? 'Saved' : 'Save failed';
+  } catch {
+    document.getElementById('saved').textContent = 'Save failed: is the server running?';
+  }
+}
+
+function verdict(v) {
+  review[items[i].video] = v;
+  save();
+  nextUnreviewed();
+}
+
+window.addEventListener('resize', render);
+window.addEventListener('keydown', e => {
+  if (e.key === 'a' || e.key === 'A') verdict('ok');
+  else if (e.key === 's' || e.key === 'S') verdict('bad');
+  else if (e.key === 'ArrowLeft') show(i - 1);
+  else if (e.key === 'ArrowRight') show(i + 1);
+  else if (e.key === 'u' || e.key === 'U') nextUnreviewed();
+  else if (e.key === 'Backspace') { delete review[items[i].video]; save(); render(); }
+});
+
+(async () => {
+  [items, review] = await Promise.all([fetch('items.json').then(r => r.json()), fetch('review.json').then(r => r.json())]);
+  i = -1;
+  nextUnreviewed();
+})();
+</script>
+</body>
+</html>

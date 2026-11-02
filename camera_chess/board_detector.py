@@ -20,14 +20,13 @@ from camera_chess.utils import draw_lines, draw_points
 class BoardDetector:
     GRID = np.concatenate(np.meshgrid(np.arange(7), np.arange(7))).reshape(2, -1).T.astype(np.float32)
 
-    def __init__(self, model_basename="480L_xcorners_480x288.onnx", device='cuda:0', iou_thresh=0.1, conf_thresh=0.3):
+    def __init__(self, model_basename="480L_xcorners_480x288.onnx", device="cuda:0", iou_thresh=0.1, conf_thresh=0.3):
         self.model_basename = model_basename
         self.device = device
         self.iou_thresh = iou_thresh
         self.conf_thresh = conf_thresh
 
-        self.model = Detector(model_basename=self.model_basename,
-                              device=self.device)
+        self.model = Detector(model_basename=self.model_basename, device=self.device)
 
     @staticmethod
     def _apply_transform(src, transform):
@@ -42,7 +41,7 @@ class BoardDetector:
         tri = Delaunay(xcorners)
         quads = []
         pairings = set()
-        for i, neighbors in enumerate(tri.neighbors):
+        for i, neighbors in enumerate(tri.neighbors.tolist()):
             for k, nk in enumerate(neighbors):
                 if nk == -1:
                     continue
@@ -137,10 +136,12 @@ class BoardDetector:
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         height, width = image.shape[:2]
-        keypoints = {"h1": np.array([0, 0]),
-                     "a1": np.array([width, 0]),
-                     "a8": np.array([width, height]),
-                     "h8": np.array([0, height])}
+        keypoints = {
+            "h1": np.array([0, 0]),
+            "a1": np.array([width, 0]),
+            "a8": np.array([width, height]),
+            "h8": np.array([0, height]),
+        }
         pred = torch.tensor(self.model.run(image, keypoints)[0])
         boxes = pred[:, :4]
         scores = pred[:, 4]
@@ -181,7 +182,7 @@ class BoardDetector:
         if len(xcorners) < 5:
             return None, None
 
-        M, quad, score, offset = self._find_transform(xcorners)
+        M, _quad, _score, offset = self._find_transform(xcorners)
         corners = self._create_corners(M, offset)
         return corners, xcorners
 
@@ -195,12 +196,12 @@ class BoardDetector:
         black_conf = np.max(preds[:, 4:10], axis=1)
         white_conf = np.max(preds[:, 10:], axis=1)
 
-        white_scores = np.dot(1/dist, white_conf)
-        black_scores = np.dot(1/dist, black_conf)
+        white_scores = np.dot(1 / dist, white_conf)
+        black_scores = np.dot(1 / dist, black_conf)
         scores = white_scores - black_scores
 
-        best_i = None
-        best_score = -float('inf')
+        best_i = 0
+        best_score = -float("inf")
         for i in range(4):
             rolled_scores = np.roll(scores, i)
             score = rolled_scores[0] + rolled_scores[1] - rolled_scores[2] - rolled_scores[3]
@@ -224,22 +225,22 @@ class BoardDetector:
 
 
 def main():
-    label_paths = list(glob(os.path.join(DATA_DIR, 'google', 'labels', '*')))
+    label_paths = list(glob(os.path.join(DATA_DIR, "google", "labels", "*")))
     detector = BoardDetector()
 
-    os.makedirs('debug', exist_ok=True)
+    os.makedirs("debug", exist_ok=True)
     total_score = 0
     for label_path in tqdm(label_paths):
-        image_path = label_path.replace('labels', 'images').replace('.json', '.jpg')
+        image_path = label_path.replace("labels", "images").replace(".json", ".jpg")
         image = cv2.imread(image_path)
 
         pred, xcorners = detector.find_corners(image)
         if pred is None:
             continue
 
-        with open(label_path, 'rb') as f:
+        with open(label_path, "rb") as f:
             label = json.load(f)
-        gt = np.array(list(label['keypoints'].values()))
+        gt = np.array(list(label["keypoints"].values()))
         height, width = image.shape[:2]
         gt[:, 0] *= width
         gt[:, 1] *= height
@@ -253,14 +254,14 @@ def main():
 
         pil_image = Image.fromarray(image[..., ::-1])
         d = ImageDraw.Draw(pil_image)
-        draw_lines(d, pred, colour='red')
-        draw_lines(d, gt, colour='blue')
+        draw_lines(d, pred, colour="red")
+        draw_lines(d, gt, colour="blue")
         draw_points(d, xcorners, colour="green")
-        save_path = os.path.join('debug', basename)
+        save_path = os.path.join("debug", basename)
         pil_image.save(save_path)
 
     tqdm.write(f"Total: {total_score:.3f}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

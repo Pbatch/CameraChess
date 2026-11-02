@@ -10,9 +10,8 @@ def main(dataset):
     video.save_start_image()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', '-d', type=str, required=True)
+    parser.add_argument("--dataset", "-d", type=str, required=True)
     args = parser.parse_args()
     main(args.dataset)
-

@@ -5,21 +5,20 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 
-from camera_chess.constants import MODEL_DIR, CORNERS
+from camera_chess.constants import CORNERS, MODEL_DIR
 from camera_chess.utils import get_roi
 
 Detections = namedtuple("Detections", "xyxy conf cls")
 
 
 class Detector:
-    def __init__(self, model_basename, fill_colour=114, device='cuda:0'):
+    def __init__(self, model_basename, fill_colour=114, device="cuda:0"):
         self.model_basename = model_basename
         self.fill_colour = fill_colour
         self.device = device
 
-        providers = [('CUDAExecutionProvider', {"cudnn_conv_algo_search": "DEFAULT"})]
-        self.sess = ort.InferenceSession(os.path.join(MODEL_DIR, self.model_basename),
-                                         providers=providers)
+        providers = [("CUDAExecutionProvider", {"cudnn_conv_algo_search": "DEFAULT"})]
+        self.sess = ort.InferenceSession(os.path.join(MODEL_DIR, self.model_basename), providers=providers)
         self.inputs = self.sess.get_inputs()[0]
         self.outputs = self.sess.get_outputs()[0]
         self.io_binding = self.sess.io_binding()
@@ -55,9 +54,9 @@ class Detector:
         pad_bottom = dy // 2
         pad_top = dy - pad_bottom
         padding = [pad_left, pad_right, pad_top, pad_bottom]
-        x = np.pad(x, ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)),
-                   mode="constant",
-                   constant_values=self.fill_colour)
+        x = np.pad(
+            x, ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), mode="constant", constant_values=self.fill_colour
+        )
 
         return x, padding
 
@@ -91,7 +90,7 @@ class Detector:
             roi = get_roi(keypoints_arr, width, height, self.model_width, self.model_height)
         else:
             roi = [0, 0, width, height]
-        image = image[roi[1]:roi[3], roi[0]:roi[2]]
+        image = image[roi[1] : roi[3], roi[0] : roi[2]]
 
         # Resize, pad and scale
         image = self._resize(image)

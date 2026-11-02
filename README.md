@@ -1,5 +1,36 @@
 # Camera Chess
 
+## Setup
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/), on Python 3.13 (Linux only).
+
+```bash
+uv sync
+uv run python -m camera_chess.overlay_moves -d yunker/Br8Y3kCJRCs
+uv run ruff check .
+uv run ty check
+uv run pytest
+```
+
+`onnxruntime-gpu` brings its own CUDA and cuDNN as pip packages, so only an NVIDIA driver is needed for the GPU.
+
+Copy `.env.example` to `.env` to put data, checkpoints or outputs on another disk. Datasets live under the
+gitignored `data/`; tests that need one skip when it isn't there.
+
+## Layout
+* `camera_chess/chessqueries/` - ChessQueries: datasets, model, metrics and Lightning training
+* `camera_chess/labels/` - building and reviewing the ChessCam and SLCC labels
+* `camera_chess/synthetic/` - synthetic boards rendered with Blender (`bpy`), see its README
+* `camera_chess/` - video tools and the model wrappers they run (`chessqueries_detector`, `chesscam_model`,
+  `chessvision_3lc`), alongside the older YOLO detector and move tracker
+* `scripts/` - downloading and packing datasets, cross-dataset evaluation, ONNX/LiteRT/TensorRT export, and
+  training on Modal (`uv sync --group modal`; see `scripts/train_chessqueries_modal.py`)
+
+## Licenses
+The ChessQueries code is under `LICENSE.chessqueries` (PolyForm Noncommercial 1.0.0) and its data under
+`DATA_LICENSE.chessqueries` (CC BY-NC 4.0). ChessQ Lite is PolyForm Noncommercial, and the ChessVision-3LC
+weights are AGPL-3.0, so keep them out of anything shipped.
+
 ## Links
 * Chesscog - https://github.com/georg-wolflein/chesscog
 * Play online - https://github.com/karayaman/Play-online-chess-with-real-chess-board

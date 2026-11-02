@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Label Review</title>
+<style>
+  :root { --bg: #16181d; --panel: #20232a; --text: #e8e8ea; --muted: #9a9ca3; --accent: #4cc38a; --suggest: #f5c84c;
+          --hit: #ff5ad1; --a1: #4c9cf5; --light: #e9d7b4; --dark: #b08960; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; gap: 16px; align-items: center; padding: 10px 16px; background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; }
+  .progress { flex: 1; min-width: 160px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+  .progress div { height: 100%; background: var(--accent); width: 0; }
+  main { display: flex; gap: 16px; padding: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .views { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+  canvas { max-width: 100%; border-radius: 6px; background: #000; display: block; }
+  aside { width: 340px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--panel); padding: 12px; border-radius: 6px; }
+  .name { font-family: ui-monospace, monospace; word-break: break-all; color: var(--muted); }
+  .claim { font-size: 16px; margin: 4px 0; }
+  .claim b { font-family: ui-monospace, monospace; }
+  .state { font-weight: 600; margin-top: 6px; }
+  .boards { display: flex; gap: 10px; }
+  .boards figure { margin: 0; flex: 1; }
+  .boards figcaption { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1; border-radius: 3px; overflow: hidden; }
+  .board div { display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; }
+  .board .l { background: var(--light); } .board .d { background: var(--dark); }
+  .board .hit { box-shadow: inset 0 0 0 2px var(--hit); }
+  .board .other { box-shadow: inset 0 0 0 2px #f5c84c88; }
+  .board .w { color: #fff; text-shadow: 0 0 1px #000, 0 0 1px #000, 0 0 1px #000; }
+  .board .b { color: #111; }
+  kbd { background: #333; border-radius: 3px; padding: 1px 5px; font-family: ui-monospace, monospace; }
+  ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+  #saved { color: var(--muted); }
+  .legend span { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Is the label right on the outlined square?</h1>
+  <div class="progress"><div id="bar"></div></div>
+  <span id="count"></span>
+  <span id="saved"></span>
+</header>
+<main>
+  <div class="views">
+    <canvas id="c"></canvas>
+    <canvas id="zoom"></canvas>
+    <div class="legend name"><span style="background:var(--suggest)"></span>disputed square
+      <span style="background:var(--a1)"></span>a1
+      <span style="background:var(--hit)"></span>labelled box on the square
+      <span style="background:#fff"></span>other boxes (red dashed: off the board)</div>
+  </div>
+  <aside>
+    <div class="card">
+      <div class="claim">Square <b id="square"></b></div>
+      <div class="claim">Label: <b id="label"></b></div>
+      <div class="claim">Model: <b id="model"></b></div>
+      <div class="name" id="probs"></div>
+      <div class="name">Second model: <span id="baseline"></span></div>
+      <div class="name" id="hint"></div>
+      <div class="name" id="name"></div>
+      <div class="name" id="same"></div>
+      <div class="state" id="state"></div>
+    </div>
+    <div class="card boards">
+      <figure><figcaption>Label</figcaption><div class="board" id="labelBoard"></div></figure>
+      <figure><figcaption>Model</figcaption><div class="board" id="modelBoard"></div></figure>
+    </div>
+    <div class="card">
+      <ul>
+        <li><kbd>L</kbd> the label is right (model wrong)</li>
+        <li><kbd>M</kbd> the model is right (label wrong)</li>
+        <li><kbd>B</kbd> both are wrong</li>
+        <li><kbd>S</kbd> can't tell</li>
+        <li>Hold <kbd>Shift</kbd> to give the same verdict to every unreviewed frame of this game with the same disagreement</li>
+        <li><kbd>←</kbd> <kbd>→</kbd> previous / next, <kbd>N</kbd> next unreviewed</li>
+        <li><kbd>H</kbd> hide / show the boxes</li>
+      </ul>
+    </div>
+  </aside>
+</main>
+<script>
+const NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+const GLYPHS = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' };
+const VERDICTS = { l: 'label', m: 'model', b: 'both', s: 'unsure' };
+const VERDICT_TEXT = { label: 'Label right', model: 'Model right', both: 'Both wrong', unsure: "Can't tell" };
+let items = [], verdicts = {}, pos = 0, showBoxes = true;
+const img = new Image();
+const canvas = document.getElementById('c'), zoom = document.getElementById('zoom');
+
+const describe = s => s ? `${s === s.toUpperCase() ? 'white' : 'black'} ${NAMES[s.toLowerCase()]}` : 'empty';
+const fenSquares = fen => fen.split('/').flatMap(row => [...row].flatMap(ch => /\d/.test(ch) ? Array(+ch).fill('') : [ch]));
+const same = (a, b) => a.group === b.group && a.index === b.index && a.label === b.label && a.model === b.model;
+
+function renderBoard(el, fen, hit, diff = []) {
+  el.innerHTML = fenSquares(fen).map((s, i) => {
+    const shade = (Math.floor(i / 8) + i) % 2 ? 'd' : 'l';
+    const colour = s ? (s === s.toUpperCase() ? 'w' : 'b') : '';
+    return `<div class="${shade} ${colour}${i === hit ? ' hit' : diff.includes(i) ? ' other' : ''}">${s ? GLYPHS[s.toLowerCase()] : ''}</div>`;
+  }).join('');
+}
+
+function polygon(ctx, points, scale) {
+  ctx.beginPath();
+  points.forEach(([x, y], i) => i ? ctx.lineTo(x * scale, y * scale) : ctx.moveTo(x * scale, y * scale));
+  ctx.closePath();
+}
+
+function drawOverlay(ctx, item, scale) {
+  polygon(ctx, item.a1, scale);
+  ctx.fillStyle = 'rgba(76,156,245,.35)'; ctx.fill();
+  const [ax, ay] = item.a1.reduce(([sx, sy], [x, y]) => [sx + x / 4, sy + y / 4], [0, 0]);
+  ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(11, 6 * scale)}px system-ui`; ctx.textAlign = 'center';
+  ctx.fillText('a1', ax * scale, ay * scale + 4);
+  if (showBoxes) {
+    for (const b of item.boxes) {
+      const [x1, y1, x2, y2] = b.box.map(v => v * scale);
+      const hit = b.square === item.index;
+      ctx.setLineDash(b.square === null ? [4, 3] : []);
+      ctx.strokeStyle = hit ? '#ff5ad1' : b.square === null ? '#ff4d4d' : 'rgba(255,255,255,.55)';
+      ctx.lineWidth = hit ? 2.5 : 1;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      if (hit || b.square === null) {
+        ctx.fillStyle = ctx.strokeStyle; ctx.textAlign = 'left'; ctx.font = 'bold 12px system-ui';
+        ctx.fillText(b.symbol, x1 + 2, y1 + 12);
+      }
+    }
+    ctx.setLineDash([]);
+  }
+  polygon(ctx, item.outline, scale);
+  ctx.strokeStyle = '#f5c84c'; ctx.lineWidth = 2.5; ctx.stroke();
+}
+
+function draw() {
+  const item = items[pos];
+  if (!item || !img.complete || !img.naturalWidth) return;
+  const width = Math.min(canvas.parentElement.clientWidth, img.naturalWidth * 2);
+  const scale = width / img.naturalWidth;
+  canvas.width = width; canvas.height = img.naturalHeight * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  drawOverlay(ctx, item, scale);
+
+  // A close-up around the square, with room for the pieces standing on its neighbours
+  const xs = item.outline.map(p => p[0]), ys = item.outline.map(p => p[1]);
+  const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2 - size * 0.6;
+  const half = size * 2.2;
+  const zw = Math.min(canvas.parentElement.clientWidth, 520), zs = zw / (2 * half);
+  zoom.width = zw; zoom.height = zw * 0.75;
+  const z = zoom.getContext('2d');
+  z.fillStyle = '#000'; z.fillRect(0, 0, zoom.width, zoom.height);
+  z.save();
+  z.translate(zoom.width / 2 - cx * zs, zoom.height / 2 - cy * zs);
+  z.drawImage(img, 0, 0, img.naturalWidth * zs, img.naturalHeight * zs);
+  drawOverlay(z, item, zs);
+  z.restore();
+}
+
+function show() {
+  const item = items[pos];
+  img.onload = draw;
+  img.src = item.image;
+  document.getElementById('square').textContent = item.square;
+  document.getElementById('label').textContent = describe(item.label);
+  document.getElementById('model').textContent = describe(item.model);
+  document.getElementById('baseline').textContent = describe(item.baseline);
+  document.getElementById('name').textContent = `${item.name} · ${pos + 1} / ${items.length}`;
+  const others = items.filter(other => other !== item && same(item, other) && !verdicts[other.key]).length;
+  document.getElementById('same').textContent = others ? `Same disagreement in ${others} other unreviewed frame(s) of this game` : '';
+  const v = verdicts[item.key];
+  document.getElementById('state').textContent = v ? VERDICT_TEXT[v.verdict] : 'Not reviewed';
+  renderBoard(document.getElementById('labelBoard'), item.label_fen, item.index, item.diff || []);
+  renderBoard(document.getElementById('modelBoard'), item.model_fen, item.index, item.diff || []);
+  document.getElementById('probs').textContent = item.p_model == null ? '' :
+    `P(model) ${(100 * item.p_model).toFixed(1)}% · P(label) ${(100 * item.p_label).toFixed(1)}%`;
+  document.getElementById('hint').textContent = item.hint ?
+    `Earlier review (vs Lite ${describe(item.hint.model)}): ${VERDICT_TEXT[item.hint.verdict]}` : '';
+  const done = items.filter(i => verdicts[i.key]).length;
+  document.getElementById('count').textContent = `${done} / ${items.length} reviewed`;
+  document.getElementById('bar').style.width = `${100 * done / items.length}%`;
+  draw();
+}
+
+async function save() {
+  const saved = document.getElementById('saved');
+  saved.textContent = 'saving…';
+  try {
+    const r = await fetch('verdicts', { method: 'POST', body: JSON.stringify(verdicts) });
+    saved.textContent = r.ok ? 'saved' : 'save failed';
+  } catch { saved.textContent = 'save failed'; }
+}
+
+function record(verdict, spread) {
+  const item = items[pos];
+  const targets = [item, ...(spread ? items.filter(o => o !== item && same(item, o) && !verdicts[o.key]) : [])];
+  for (const t of targets) verdicts[t.key] = { verdict, square: t.square, label: t.label, model: t.model };
+  save();
+  nextUnreviewed();
+}
+
+function nextUnreviewed() {
+  const next = items.findIndex((i, n) => n > pos && !verdicts[i.key]);
+  const first = items.findIndex(i => !verdicts[i.key]);
+  pos = next >= 0 ? next : first >= 0 ? first : pos;
+  show();
+}
+
+window.addEventListener('resize', draw);
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (VERDICTS[key]) record(VERDICTS[key], e.shiftKey);
+  else if (e.key === 'ArrowRight') { pos = Math.min(pos + 1, items.length - 1); show(); }
+  else if (e.key === 'ArrowLeft') { pos = Math.max(pos - 1, 0); show(); }
+  else if (key === 'n') nextUnreviewed();
+  else if (key === 'h') { showBoxes = !showBoxes; draw(); }
+  else return;
+  e.preventDefault();
+});
+
+(async () => {
+  [items, verdicts] = await Promise.all([fetch('items.json').then(r => r.json()), fetch('verdicts.json').then(r => r.json())]);
+  const first = items.findIndex(i => !verdicts[i.key]);
+  pos = first >= 0 ? first : 0;
+  show();
+})();
+</script>
+</body>
+</html>
