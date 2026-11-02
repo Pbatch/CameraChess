@@ -15,7 +15,7 @@ from tqdm import tqdm
 from camera_chess.chessqueries.models.predictor import Predictor
 from camera_chess.config import get_config
 
-# Kept in step with make_chessqueries_dataset.py, which needs OpenCV rather than torch
+# Kept in step with frames.py, which needs OpenCV rather than torch
 SYMBOLS = "bknpqrBKNPQR"
 EXCLUDED_PREFIXES = ("chessred2k",)
 

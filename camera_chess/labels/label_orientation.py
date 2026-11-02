@@ -21,7 +21,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.config import get_config
-from camera_chess.labels.make_chessqueries_dataset import (
+from camera_chess.labels.frames import (
     CLASSES,
     PHOTO_PREFIXES,
     choose_rotation_by_model,
