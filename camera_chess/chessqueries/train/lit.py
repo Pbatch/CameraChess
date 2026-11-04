@@ -130,9 +130,12 @@ class JointDataModule(pl.LightningDataModule):
         augment: Augment | str = Augment.PHOTOMETRIC,
         normalization: Normalization = Normalization.IMAGENET,
         gpu_augment: bool = False,
+        all_splits: bool = False,
     ) -> None:
         super().__init__()
         self.sources = tuple(sources)
+        # Train on every split of every source (train, val and test) and skip validation
+        self.all_splits = all_splits
         self.resolution = resolution
         self.batch_size = batch_size
         self.workers = workers
@@ -148,10 +151,11 @@ class JointDataModule(pl.LightningDataModule):
             ds = get_dataset(name)
             if Split.TRAIN not in ds.splits:
                 raise ValueError(f"{name.value} lacks a TRAIN split; cannot join-train on it.")
-            has_val = Split.VAL in ds.splits
+            has_val = Split.VAL in ds.splits and not self.all_splits
+            train_splits = ds.splits if self.all_splits else (Split.TRAIN,)
             if self.gpu_augment is not None:
                 tf = square_uint8(self.resolution)
-                train_parts.append(ds.torch_dataset(Split.TRAIN, transform=tf, uint8=True))
+                train_parts.extend(ds.torch_dataset(split, transform=tf, uint8=True) for split in train_splits)
                 if has_val:
                     val_parts.append(ds.torch_dataset(Split.VAL, transform=tf, uint8=True))
                 continue
@@ -159,12 +163,15 @@ class JointDataModule(pl.LightningDataModule):
                 self.resolution, train=True, augment=self.augment, normalization=self.normalization
             )
             val_tf = build_transform(self.resolution, train=False, normalization=self.normalization)
-            train_parts.append(ds.torch_dataset(Split.TRAIN, transform=train_tf))
+            train_parts.extend(ds.torch_dataset(split, transform=train_tf) for split in train_splits)
             if has_val:
                 val_parts.append(ds.torch_dataset(Split.VAL, transform=val_tf))
+        self.train_ds = ConcatDataset(train_parts)
+        if self.all_splits:
+            self.val_ds = None
+            return
         if not val_parts:
             raise ValueError("No source has a VAL split, which checkpointing needs")
-        self.train_ds = ConcatDataset(train_parts)
         self.val_ds = ConcatDataset(val_parts)
 
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
@@ -185,7 +192,9 @@ class JointDataModule(pl.LightningDataModule):
             persistent_workers=self.workers > 0,
         )
 
-    def val_dataloader(self) -> DataLoader:
+    def val_dataloader(self) -> DataLoader | list:
+        if self.val_ds is None:
+            return []
         return DataLoader(
             self.val_ds,
             batch_size=self.batch_size,

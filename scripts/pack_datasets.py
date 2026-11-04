@@ -1,4 +1,5 @@
-"""Pack the training datasets (ChessReD, ChessCog, ChessCam, SLCC, synthetic, Yunker) into one tar with smaller images.
+"""Pack the datasets (ChessReD, ChessCog, ChessCam, SLCC, synthetic, Yunker, CVChess, Digitizer, Fenit,
+Samryan) into one tar with smaller images.
 
 Images whose shorter side exceeds --max-side are shrunk to it (aspect kept) and every image is
 stored as JPEG, so the tar holds no more pixels than training at that resolution uses: the
@@ -28,16 +29,23 @@ from tqdm import tqdm
 
 from camera_chess.config import REPO_ROOT, get_config
 
-# Each dataset's folder under data/; SLCC's also holds its release bundle and source videos.
-# The synthetic renders are the 5k set from camera_chess/synthetic/render.py (data/synthetic holds only its FENs)
-DATASETS = {
-    "chessred": "chessred",
-    "chesscog": "chesscog",
-    "chesscam": "chesscam",
-    "slcc": "slcc/dataset",
-    "synthetic": "synthetic_5k",
+# The folders (or files) under data/ each dataset's loader reads; SLCC's folder also holds its release
+# bundle and source videos. The synthetic renders are the 5k set from camera_chess/synthetic/render.py
+# (data/synthetic holds only its FENs)
+DATASETS: dict[str, tuple[str, ...]] = {
+    "chessred": ("chessred",),
+    "chesscog": ("chesscog",),
+    "chesscam": ("chesscam",),
+    "slcc": ("slcc/dataset",),
+    "synthetic": ("synthetic_5k",),
     # Crops from camera_chess/videos/make_training_data.py; data/yunker holds the source videos
-    "yunker": "yunker_crops",
+    "yunker": ("yunker_crops",),
+    # Its labels are vendored in the package; only the photos are data
+    "cvchess": ("cvchess/images",),
+    # Built crops and annotations; source/ holds the raw downloads they were made from
+    "digitizer": ("digitizer/images", "digitizer/annotations.json"),
+    "fenit": ("fenit/images", "fenit/annotations.json"),
+    "samryan": ("samryan/images", "samryan/annotations.json"),
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
@@ -80,12 +88,15 @@ def shrink(job: tuple[Path, Path, int, int]) -> bytes:
 def plan(src_root: Path, cache_root: Path, max_side: int, quality: int) -> tuple[list, list]:
     """(image jobs, other files to copy) for every dataset, each as (source, path under data/)"""
     jobs, copies = [], []
-    for name, folder in DATASETS.items():
-        root = src_root / folder
-        if not root.is_dir():
-            raise SystemExit(f"{root} not found; download or build {name} first")
+    for name, parts in DATASETS.items():
+        paths = []
+        for part in parts:
+            root = src_root / part
+            if not root.exists():
+                raise SystemExit(f"{root} not found; download or build {name} first")
+            paths.extend([root] if root.is_file() else root.rglob("*"))
         # Sorted so the tar's member order, and with it its sha256, is reproducible
-        for path in sorted(root.rglob("*")):
+        for path in sorted(paths):
             if not path.is_file():
                 continue
             rel = path.relative_to(src_root)

@@ -62,3 +62,20 @@ def test_progression_is_coherent():
             jumps += 1
     # A handful of game boundaries could in principle jump; here we expect none.
     assert jumps == 0, f"{jumps} incoherent frame transitions"
+
+
+def test_splits_keep_runs_of_positions_together():
+    """Every photo of a position, and of its neighbours in the same chunk, lands in one split"""
+    from collections import Counter
+
+    from camera_chess.chessqueries.core import Split
+    from camera_chess.chessqueries.data.cvchess import CVChess, assign_splits
+
+    labels = load_labels()
+    splits = assign_splits(labels)
+    by_fen: dict[str, set] = {}
+    for label, split in zip(labels, splits, strict=True):
+        by_fen.setdefault(label["gt_fen"], set()).add(split)
+    assert all(len(s) == 1 for s in by_fen.values())
+    assert dict(Counter(splits)) == dict(CVChess.expected_samples)
+    assert set(splits) == {Split.TRAIN, Split.VAL, Split.TEST}

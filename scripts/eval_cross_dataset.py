@@ -1,7 +1,8 @@
 """Evaluate a trained ChessQueries checkpoint on any dataset, zero-shot.
 
-Fills a cell of the cross-dataset reproduction matrix. CVChess has no official
-split (pass no --split); ChessCog/ChessReD require one.
+Fills a cell of the cross-dataset reproduction matrix. Every dataset needs a
+--split; CVChess's are ours (camera_chess.chessqueries.data.cvchess.assign_splits),
+so --split test is only a third of the game the earlier all-images numbers used.
 
 With ``--subset-by`` the same inference pass also reports a low/high breakdown of
 the headline metrics along a per-sample feature (e.g. crop resolution), so you

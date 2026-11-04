@@ -16,12 +16,9 @@ if [[ ! -f "$checkpoint" ]]; then
 fi
 echo "eval_all_domains: name=$name checkpoint=$checkpoint ${res_args[*]}"
 
-for pair in "chesscam test" "chessred test" "chesscog test" "slcc test"; do
+for pair in "chesscam test" "chessred test" "chesscog test" "slcc test" "cvchess test"; do
   set -- $pair
   uv run python -m scripts.eval_cross_dataset \
     --checkpoint "$checkpoint" --dataset "$1" --split "$2" "${res_args[@]}" --name "$name"
 done
-# CVChess has no split (zero-shot, one game).
-uv run python -m scripts.eval_cross_dataset \
-  --checkpoint "$checkpoint" --dataset cvchess "${res_args[@]}" --name "$name"
 echo "eval_all_domains DONE: $name"

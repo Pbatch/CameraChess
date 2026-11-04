@@ -26,8 +26,8 @@ def test_resolve_split_split_datasets_and_splitless():
     with pytest.raises(SystemExit):
         resolve_split(chessred, None)  # split required
 
-    cvchess = get_dataset(DatasetName.CVCHESS)
-    assert resolve_split(cvchess, None) is None  # split-less dataset
+    yunker = get_dataset(DatasetName.YUNKER)
+    assert resolve_split(yunker, "train") is Split.TRAIN
 
 
 def _samples(tmp_path, n=2):

@@ -57,11 +57,17 @@ TRAINING_PACKAGES = (
     "pydantic-settings==2.16.2",
     "python-dotenv==1.2.4",
     "loguru==0.7.3",
+    # Only for the Digitizer, Fenit and Samryan loaders
+    "chess==1.11.2",
+    "opencv-python==4.11.0.86",
 )
 image = (
     modal.Image.debian_slim(python_version=PYTHON_VERSION)
+    .apt_install("libgl1", "libglib2.0-0")  # for opencv-python
     .uv_pip_install(*TRAINING_PACKAGES)
     .add_local_python_source("camera_chess")
+    # add_local_python_source ships only .py files; CVChess's labels are vendored JSON
+    .add_local_dir("camera_chess/chessqueries/data/resources", "/root/camera_chess/chessqueries/data/resources")
 )
 
 
@@ -112,6 +118,8 @@ def main(
     init_weights: str | None = None,
     eval_datasets: str | None = None,
     gpu_augment: bool | None = None,
+    # Train on every split (no validation or test on the trained datasets)
+    all_splits: bool | None = None,
     wandb_project: str | None = None,
     wandb_entity: str | None = None,
     evaluate_only: bool = False,
@@ -135,6 +143,7 @@ def main(
         "init_weights": init_weights,
         "eval_datasets": eval_datasets,
         "gpu_augment": gpu_augment,
+        "all_splits": all_splits,
         "wandb_project": wandb_project,
         "wandb_entity": wandb_entity,
     }

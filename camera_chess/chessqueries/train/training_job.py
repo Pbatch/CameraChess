@@ -92,6 +92,9 @@ class TrainingConfig:
     augment: Augment = Augment.GEOMETRIC_MILD
     # Augment on the GPU per batch; loader workers on CPU then only decode and resize
     gpu_augment: bool = True
+    # Train on every split (train, val and test) of `datasets`, with no validation; only the last
+    # weights are kept, and the test scores only cover eval datasets that weren't trained on
+    all_splits: bool = False
     head_type: HeadType = HeadType.QUERY
     decoder_layers: int = 4
     seed: int = 1
@@ -125,6 +128,8 @@ class TrainingConfig:
             raise ValueError("The encoder must unfreeze before the last epoch")
         self.sources()
         self.eval_sources()
+        if self.all_splits and set(self.sources()) & set(self.eval_sources()):
+            raise ValueError("With all_splits the test splits are trained on, so evaluate only on other datasets")
 
     def patch_size(self) -> int:
         """From the timm name, e.g. 14 for DINOv2's vit_*_patch14_*, 16 for DINOv3's vit_*_patch16_*"""
@@ -185,13 +190,13 @@ def evaluate_on_test(model: ChessQueriesModel, config: TrainingConfig) -> dict[s
 class VolumeCheckpoint(ModelCheckpoint):
     """Keeps the best (by validation board accuracy) and last checkpoints, committing each save"""
 
-    def __init__(self, output: Path, commit: Callable[[], None]) -> None:
+    def __init__(self, output: Path, commit: Callable[[], None], keep_best: bool = True) -> None:
         super().__init__(
             dirpath=output / "checkpoints",
             filename="best",
-            monitor="val_board_acc",
+            monitor="val_board_acc" if keep_best else None,
             mode="max",
-            save_top_k=1,
+            save_top_k=1 if keep_best else 0,
             save_last=True,
             enable_version_counter=False,
         )
@@ -288,6 +293,7 @@ class ChessQueriesTrainingJob:
                 config.workers,
                 augment=config.augment,
                 gpu_augment=config.gpu_augment,
+                all_splits=config.all_splits,
             )
             model = LitChessQueriesModel(
                 encoder_name=config.encoder,
@@ -307,7 +313,7 @@ class ChessQueriesTrainingJob:
             # About 1.2x faster steps after a compile of under a minute. In place, so state dict keys
             # (and so checkpoints and exports) stay unchanged
             model.model.compile()
-            callback = VolumeCheckpoint(output, self.commit)
+            callback = VolumeCheckpoint(output, self.commit, keep_best=not config.all_splits)
             wandb_logger = create_wandb_logger(
                 output,
                 run_name=config.run_name,
@@ -322,6 +328,7 @@ class ChessQueriesTrainingJob:
                 precision=config.precision,
                 gradient_clip_val=1.0,
                 log_every_n_steps=20,
+                limit_val_batches=0 if config.all_splits else None,
                 callbacks=[callback, LearningRateMonitor(logging_interval="step")],
                 logger=[CSVLogger(str(output), name="logs"), wandb_logger],
                 default_root_dir=output,
@@ -342,6 +349,8 @@ class ChessQueriesTrainingJob:
                     ("best", callback.best_model_path),
                     ("last", callback.last_model_path),
                 ):
+                    if not path:  # no best without validation
+                        continue
                     export_lightning_safetensors(
                         Path(path), output / f"{kind}.safetensors", resolution=config.resolution
                     )

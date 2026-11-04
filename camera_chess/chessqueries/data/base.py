@@ -3,6 +3,7 @@ the dataset registry."""
 
 from __future__ import annotations
 
+import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -213,4 +214,8 @@ class ChessDataset(ABC):
 
 
 def get_dataset(name: DatasetName) -> ChessDataset:
+    """Each loader lives in the module named after its dataset and registers itself when that is
+    imported, so only the loaders in use (and their dependencies, e.g. cv2 or python-chess) load"""
+    if name not in DATASET_REGISTRY:
+        importlib.import_module(f"{__package__}.{name.value}")
     return DATASET_REGISTRY[name]()

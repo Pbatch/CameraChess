@@ -117,6 +117,7 @@ def test_bad_settings_fail_before_submitting(tmp_path: Path, monkeypatch: pytest
         {"datasets": "chessred,imagenet"},
         {"augment": "sideways"},
         {"lr_scaling": "cubic"},
+        {"all_splits": True, "datasets": "chesscam,yunker", "eval_datasets": "chesscam,chessred"},
     ],
 )
 def test_config_rejects_bad_settings(change: dict[str, Any]) -> None:
