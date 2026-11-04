@@ -5,11 +5,11 @@ import itertools
 import chess
 
 from camera_chess.chessqueries.core import NUM_PIECES, Board
-from camera_chess.chessqueries.data.cvchess import _load_labels
+from camera_chess.chessqueries.data.cvchess import load_labels
 
 
 def test_labels_parse_and_convert():
-    labels = _load_labels()
+    labels = load_labels()
     assert len(labels) == 352
     for e in labels:
         assert e["image"].endswith(".jpg")
@@ -32,7 +32,7 @@ def test_first_frame_is_start_position():
     import re
 
     START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
-    labels = sorted(_load_labels(), key=lambda e: int(re.findall(r"\d+", e["image"])[0]))
+    labels = sorted(load_labels(), key=lambda e: int(re.findall(r"\d+", e["image"])[0]))
     assert labels[0]["gt_fen"].split()[0] == START, (
         f"first frame {labels[0]['image']} is not the start position "
         f"(got {labels[0]['gt_fen'].split()[0]!r}) — labels likely off by one ply"
@@ -43,7 +43,7 @@ def test_progression_is_coherent():
     """Consecutive frames are the same position or one legal move apart."""
     import re
 
-    labels = sorted(_load_labels(), key=lambda e: int(re.findall(r"\d+", e["image"])[0]))
+    labels = sorted(load_labels(), key=lambda e: int(re.findall(r"\d+", e["image"])[0]))
     jumps = 0
     for a, b in itertools.pairwise(labels):
         fa, fb = a["gt_fen"].split(" ")[0], b["gt_fen"].split(" ")[0]

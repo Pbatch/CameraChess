@@ -15,8 +15,9 @@ import tarfile
 import tempfile
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Literal, cast, get_args
+from typing import Literal, get_args
 
 import pytorch_lightning as pl
 import torch
@@ -41,9 +42,17 @@ from camera_chess.config import get_config
 
 Precision = Literal["32-true", "16-mixed", "bf16-mixed"]
 PRECISIONS = set(get_args(Precision))
-# How the learning rates grow with the batch size, relative to the paper's batch of 6
-LR_SCALINGS = {"none", "sqrt", "linear"}
 PAPER_BATCH_SIZE = 6
+
+
+class LrScaling(str, Enum):
+    """How the learning rates grow with the batch size, relative to the paper's batch of 6"""
+
+    NONE = "none"
+    SQRT = "sqrt"
+    LINEAR = "linear"
+
+
 # Settings that must not change when resuming: the checkpoint can't record them all, and a new
 # batch size would rescale the learning rates mid-schedule
 RESUME_FIXED = (
@@ -60,7 +69,7 @@ RESUME_FIXED = (
 @dataclass(frozen=True, slots=True)
 class TrainingConfig:
     """Defaults train DINOv3 ViT-S/16 at 448px, the browser model's size, on ChessReD, ChessCog,
-    ChessCam, SLCC and our synthetic renders. The rest is the paper recipe (tuned for DINOv2 ViT-L/14 at 644px), except the batch:
+    ChessCam, SLCC, our synthetic renders and the Yunker crops. The rest is the paper recipe (tuned for DINOv2 ViT-L/14 at 644px), except the batch:
     the paper's 6 leaves an A100-80GB mostly idle, so it is 16 here, with the paper's learning
     rates (given for batch 6) scaled by the square root of the batch ratio."""
 
@@ -68,22 +77,22 @@ class TrainingConfig:
     run_name: str
     epochs: int = 45
     batch_size: int = 16
-    lr_scaling: str = "sqrt"
+    lr_scaling: LrScaling = LrScaling.SQRT
     resume_checkpoint: str = ""
-    precision: str = "bf16-mixed"
+    precision: Precision = "bf16-mixed"
     resolution: int = 448
     encoder: str = "vit_small_patch16_dinov3.lvd1689m"
-    datasets: str = "chessred,chesscog,chesscam,slcc,synthetic"
+    datasets: str = "chessred,chesscog,chesscam,slcc,synthetic,yunker"
     learning_rate: float = 1.4e-4
     encoder_learning_rate: float = 1.4e-5
     weight_decay: float = 0.05
     warmup_epochs: int = 3
     unfreeze_epoch: int = 5
     lr_floor: float = 0.001
-    augment: str = Augment.GEOMETRIC_MILD.value
+    augment: Augment = Augment.GEOMETRIC_MILD
     # Augment on the GPU per batch; loader workers on CPU then only decode and resize
     gpu_augment: bool = True
-    head_type: str = HeadType.QUERY.value
+    head_type: HeadType = HeadType.QUERY
     decoder_layers: int = 4
     seed: int = 1
     workers: int = 8
@@ -95,6 +104,13 @@ class TrainingConfig:
     wandb_entity: str = ""
 
     def __post_init__(self) -> None:
+        # Settings arrive as plain strings from Modal and the CLI; each is checked and converted here, once. The enums
+        # are strs, so config.json and the resume and weights checks still see the plain values
+        for name, kind in (("lr_scaling", LrScaling), ("augment", Augment), ("head_type", HeadType)):
+            try:
+                object.__setattr__(self, name, kind(getattr(self, name)))
+            except ValueError:
+                raise ValueError(f"{name} must be one of {[k.value for k in kind]}") from None
         if self.epochs < 1 or self.batch_size < 1:
             raise ValueError("Use positive epochs and batch size")
         if not self.run_name or Path(self.run_name).name != self.run_name:
@@ -107,10 +123,6 @@ class TrainingConfig:
             raise ValueError("Learning rates must be positive and finite")
         if not 0 <= self.unfreeze_epoch < self.epochs:
             raise ValueError("The encoder must unfreeze before the last epoch")
-        if self.lr_scaling not in LR_SCALINGS:
-            raise ValueError(f"LR scaling must be one of {sorted(LR_SCALINGS)}")
-        Augment(self.augment)
-        HeadType(self.head_type)
         self.sources()
         self.eval_sources()
 
@@ -130,7 +142,7 @@ class TrainingConfig:
     def lr_factor(self) -> float:
         """Multiplier on the learning rates, which are given for the paper's batch of 6"""
         ratio = self.batch_size / PAPER_BATCH_SIZE
-        return {"none": 1.0, "sqrt": ratio**0.5, "linear": ratio}[self.lr_scaling]
+        return {LrScaling.NONE: 1.0, LrScaling.SQRT: ratio**0.5, LrScaling.LINEAR: ratio}[self.lr_scaling]
 
 
 def check_weights_match(path: Path, config: TrainingConfig) -> None:
@@ -139,7 +151,7 @@ def check_weights_match(path: Path, config: TrainingConfig) -> None:
     metadata = read_safetensors_metadata(path)
     expected = {
         "encoder_name": config.encoder,
-        "head_type": config.head_type,
+        "head_type": config.head_type.value,
         "decoder_layers": str(config.decoder_layers),
     }
     mismatched = {key: (metadata.get(key), value) for key, value in expected.items() if metadata.get(key) != value}
@@ -307,7 +319,7 @@ class ChessQueriesTrainingJob:
                 accelerator="gpu",
                 devices=1,
                 max_epochs=config.epochs,
-                precision=cast(Precision, config.precision),  # checked in TrainingConfig
+                precision=config.precision,
                 gradient_clip_val=1.0,
                 log_every_n_steps=20,
                 callbacks=[callback, LearningRateMonitor(logging_interval="step")],

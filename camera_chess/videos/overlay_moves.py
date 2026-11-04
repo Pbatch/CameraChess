@@ -12,22 +12,29 @@ position. Anything else, such as the camera view or the wall once the overlay is
 Usage: python -m camera_chess.videos.overlay_moves -d yunker/Br8Y3kCJRCs [-d ...]
 Writes gt.pgn and overlay_moves.json (with each move's time) to the dataset. A new game starts whenever the start
 position comes back, and a video of several games is cut into a dataset per game, `<dataset>_game_N` (see write).
+
+A promotion whose pawn the players left on the board, as blitz players often do, is marked by hand in gt.pgn with a
+comment on the move: `{ [%pawn_left] }` if the pawn stood there until the square next changed, or
+`{ [%pawn_left 433.0] }` if it was swapped for the new piece at that second of the video. The overlay shows the new
+piece either way, so it stays the true move, but camera_chess.videos.make_training_data labels the square as the pawn.
+Rerunning this keeps such comments on moves that are read the same again.
 """
 
 import argparse
 import copy
 import json
+import re
 import subprocess
 
 import chess
 import chess.pgn
 import numpy as np
-import yaml
 from loguru import logger
 
 from camera_chess.config import get_config
+from camera_chess.videos import ffmpeg
 from camera_chess.videos.chessvision_3lc import SQUARE, SYMBOLS, UNKNOWN, SquareClassifier
-from camera_chess.videos.config import CONFIG_PATH, load_all, load_config, video_path
+from camera_chess.videos.config import load_all, load_config, save_all, video_path
 
 SIZE = 8 * SQUARE
 # Frames read per second of video
@@ -49,35 +56,7 @@ LEAD_IN = 3.0
 
 def read_frames(path, roi):
     """Yields (time, SIZE x SIZE x 3 crop of the overlay) at FPS"""
-    x, y, w, h = roi
-    cmd = [
-        "ffmpeg",
-        "-v",
-        "error",
-        # Decoding is most of the cost, and these videos' B-frames (over half) aren't needed by other frames, so they
-        # are skipped. The fps filter takes the nearest decoded frame instead, at most a frame or two away.
-        "-skip_frame",
-        "noref",
-        "-i",
-        path,
-        "-vf",
-        f"fps={FPS},crop={w}:{h}:{x}:{y},scale={SIZE}:{SIZE}:flags=bilinear",
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        "rgb24",
-        "-",
-    ]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    assert process.stdout is not None
-    n = 0
-    while True:
-        raw = process.stdout.read(SIZE * SIZE * 3)
-        if len(raw) < SIZE * SIZE * 3:
-            break
-        yield n / FPS, np.frombuffer(raw, np.uint8).reshape(SIZE, SIZE, 3)
-        n += 1
-    process.wait()
+    return ffmpeg.read_frames(path, roi, SIZE, FPS)
 
 
 # Frames with fewer readable squares than this are skipped, as a frame of unreadable squares matches any position
@@ -185,12 +164,42 @@ def cut_video(path, out_path, start, end):
     subprocess.run([*cmd, "-crf", "18", "-preset", "fast", out_path], check=True)
 
 
+PAWN_LEFT = re.compile(r"\[%pawn_left(?:\s+([\d.]+))?\]")
+
+
+def read_comments(path):
+    """Each move's comment in a gt.pgn, by its index in the game, as (uci, comment)"""
+    if not path.exists():
+        return {}
+    with path.open() as f:
+        game = chess.pgn.read_game(f)
+    if game is None:
+        return {}
+    return {i: (node.move.uci(), node.comment) for i, node in enumerate(game.mainline()) if node.comment}
+
+
+def read_pawns_left(dataset):
+    """The promotions whose pawn was left on the board, by move index: the second of the video the pawn was swapped
+    for the new piece, or None if it stood until the square next changed"""
+    out = {}
+    for i, (uci, comment) in read_comments(get_config().DATA_ROOT / dataset / "gt.pgn").items():
+        if (match := PAWN_LEFT.search(comment)) is not None:
+            if len(uci) != 5:
+                raise ValueError(f"{dataset}: move {i + 1}, {uci}, is marked [%pawn_left] but isn't a promotion")
+            out[i] = None if match.group(1) is None else float(match.group(1))
+    return out
+
+
 def write_game(dataset, game):
     d = get_config().DATA_ROOT / dataset
+    # Comments added by hand, kept on the moves that are read the same again
+    comments = read_comments(d / "gt.pgn")
     pgn = chess.pgn.Game()
     node = pgn
-    for _, uci in game["moves"]:
+    for i, (_, uci) in enumerate(game["moves"]):
         node = node.add_variation(chess.Move.from_uci(uci))
+        if i in comments and comments[i][0] == uci:
+            node.comment = comments[i][1]
     pgn.headers["Result"] = node.board().result()
     (d / "gt.pgn").write_text(str(pgn) + "\n")
     (d / "overlay_moves.json").write_text(
@@ -231,7 +240,7 @@ def write(dataset, games):
         write_game(part, {**game, "moves": moves})
         # A deep copy, as safe_dump writes lists shared between entries as aliases
         config[part] = copy.deepcopy(config[dataset])
-    CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False))
+    save_all(config)
 
 
 def main(datasets):

@@ -9,15 +9,11 @@ meaning the same as in make_chessqueries_dataset.py, which reads the file.
 from __future__ import annotations
 
 import argparse
-import json
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote
 
 import numpy as np
 import orjson
-from loguru import logger
 from tqdm import tqdm
 
 from camera_chess.config import get_config
@@ -30,9 +26,10 @@ from camera_chess.labels.frames import (
     rotate,
     save_alignments,
 )
+from camera_chess.local_server import LocalHandler, save_json, serve
 
-ROOT = get_config().labels_root
-LABELS = ROOT / "orientation_labels.json"
+# In the labels folder
+LABELS = "orientation_labels.json"
 
 
 CORNER_SQUARES = {"a1": (0, 0), "h1": (7, 0), "h8": (7, 7), "a8": (0, 7)}
@@ -52,14 +49,14 @@ def board_corners(H: np.ndarray) -> list[dict[str, list[float]]]:
     return rotations
 
 
-def build_items(predictions: dict) -> list[dict]:
+def build_items(predictions: dict, root: Path) -> list[dict]:
     items = []
     for split in ("train", "val"):
-        for path in tqdm(sorted((ROOT / "xcorners" / split / "labels").glob("*.txt")), desc=split):
+        for path in tqdm(sorted((root / "xcorners" / split / "labels").glob("*.txt")), desc=split):
             name = path.stem
             if is_excluded(name) or not name.startswith(PHOTO_PREFIXES):
                 continue
-            frame = load_frame(name, split, ROOT, 1 / 3, 0.5)
+            frame = load_frame(name, split, root, 1 / 3, 0.5)
             # Only boards with both kings, one of each colour, are worth labelling
             if frame is None or any(
                 np.sum(frame.classes == CLASSES.index(king)) != 1 for king in ("white-king", "black-king")
@@ -76,65 +73,53 @@ def build_items(predictions: dict) -> list[dict]:
                     "margin": margin,
                 }
             )
-    save_alignments(ROOT)
+    save_alignments(root)
     # The ones the model is least sure of first
     items.sort(key=lambda x: x["margin"])
     return items
 
 
-class Handler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, items_json: bytes, **kwargs):
+class Handler(LocalHandler):
+    def __init__(self, *args, items_json: bytes, root: Path, **kwargs):
         self.items_json = items_json
-        super().__init__(*args, directory=str(ROOT), **kwargs)
-
-    def _send(self, body: bytes, content_type: str = "application/json") -> None:
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self.root = root
+        super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:
-        path = unquote(self.path.split("?")[0])
+        path = self.route
+        labels = self.root / LABELS
         if path == "/":
-            self._send((Path(__file__).parent / "label_orientation.html").read_bytes(), "text/html; charset=utf-8")
+            self.send_page(Path(__file__).with_name("label_orientation.html"))
         elif path == "/items.json":
-            self._send(self.items_json)
+            self.send(self.items_json)
         elif path == "/labels.json":
-            self._send(LABELS.read_bytes() if LABELS.exists() else b"{}")
-        elif path.startswith("/img/"):
+            self.send(labels.read_bytes() if labels.exists() else b"{}")
+        elif path.startswith(("/img/train/", "/img/val/")):
             split, name = path[len("/img/") :].split("/", 1)
-            image = ROOT / "pieces" / split / "images" / Path(name).name
-            if split in ("train", "val") and image.is_file():
-                self._send(image.read_bytes(), "image/jpeg")
-            else:
-                self.send_error(404)
+            self.send_file(self.root / "pieces" / split / "images" / Path(name).name, "image/jpeg")
         else:
             self.send_error(404)
 
     def do_POST(self) -> None:
-        if self.path != "/labels":
+        if self.route != "/labels":
             self.send_error(404)
             return
-        labels = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        tmp = LABELS.with_suffix(".tmp")
-        tmp.write_text(json.dumps(labels, indent=1, sort_keys=True))
-        tmp.replace(LABELS)
-        self._send(b'{"ok": true}')
-
-    def log_message(self, format: str, *args) -> None:
-        pass
+        save_json(self.root / LABELS, self.read_json())
+        self.send_json({"ok": True})
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--root", type=Path, default=get_config().labels_root)
     args = parser.parse_args()
-    predictions = orjson.loads((ROOT / "chessq_predictions.json").read_bytes())
-    items_json = orjson.dumps(build_items(predictions))
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, items_json=items_json))
-    logger.info(f"Labelling at http://127.0.0.1:{args.port} (labels in {LABELS})")
-    server.serve_forever()
+    predictions = orjson.loads((args.root / "chessq_predictions.json").read_bytes())
+    items_json = orjson.dumps(build_items(predictions, args.root))
+    serve(
+        partial(Handler, items_json=items_json, root=args.root),
+        args.port,
+        f"Labelling (labels in {args.root / LABELS})",
+    )
 
 
 if __name__ == "__main__":

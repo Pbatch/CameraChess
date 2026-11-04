@@ -38,14 +38,6 @@ class Prediction:
     def lichess_url(self) -> str:
         return self.board.lichess_url()
 
-    def to_record(self) -> dict[str, str]:
-        """The serialized (JSON/API) shape."""
-        return {
-            "image": str(self.image_path),
-            "fen": self.fen,
-            "lichess_url": self.lichess_url,
-        }
-
 
 class Predictor:
     """A recognizer plus its eval transform: load the checkpoint once, predict many.

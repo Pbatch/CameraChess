@@ -26,7 +26,7 @@ def test_counts_come_from_disk_so_strict_loading_passes(tmp_path):
     _render(tmp_path, "val", "000002")
     ds = Synthetic(tmp_path)
     assert ds.expected_samples == {Split.TRAIN: 2, Split.VAL: 1, Split.TEST: 0}
-    train = ds.load_samples(Split.TRAIN)
+    train = ds.torch_dataset(Split.TRAIN).samples
     assert [s.image_path.suffix for s in train] == [".png", ".jpg"]
     assert all(s.dataset is DatasetName.SYNTHETIC for s in train)
     assert train[0].board.placement == FEN

@@ -5,14 +5,13 @@ from __future__ import annotations
 import json
 from enum import Enum
 from pathlib import Path
+from types import MappingProxyType
 
 from camera_chess.chessqueries.core import Board, Split
 from camera_chess.chessqueries.data.base import BoardSample, ChessDataset, DatasetName
-from camera_chess.chessqueries.data.inventory import FROZEN_SAMPLE_COUNTS
 from camera_chess.config import get_config
 
-VENDORED_LABELS = Path(__file__).parent / "resources" / "cvchess_labels.json"
-VENDORED_VIEWPOINTS = Path(__file__).parent / "resources" / "cvchess_viewpoints.json"
+RESOURCES = Path(__file__).parent / "resources"
 
 
 class Viewpoint(str, Enum):
@@ -30,45 +29,37 @@ class Viewpoint(str, Enum):
     BOTTOM_RIGHT = "bottom_right"
 
 
-def _labels_path(cvchess_root: Path) -> Path:
-    runtime = cvchess_root / "annotations.json"
-    return runtime if runtime.is_file() else VENDORED_LABELS
+def load_labels() -> list[dict]:
+    return json.loads((RESOURCES / "cvchess_labels.json").read_text())
 
 
-def _load_labels(path: Path = VENDORED_LABELS) -> list[dict]:
-    with open(path) as f:
-        return json.load(f)
-
-
-def _load_viewpoints(path: Path = VENDORED_VIEWPOINTS) -> dict[str, Viewpoint | None]:
+def load_viewpoints() -> dict[str, Viewpoint | None]:
     """sample_id -> camera viewpoint (where the white player sits), if labelled."""
-    if not path.is_file():
-        return {}
-    raw = json.loads(path.read_text()).get("white_side", {})
+    raw = json.loads((RESOURCES / "cvchess_viewpoints.json").read_text())["white_side"]
     return {sid: Viewpoint(v) if v else None for sid, v in raw.items()}
 
 
 class CVChess(ChessDataset):
+    """Only the images live under ``root/images``; the labels are vendored in ``resources``."""
+
     name = DatasetName.CVCHESS
     splits = ()  # no official split
-    expected_samples = FROZEN_SAMPLE_COUNTS[name]
+    expected_samples = MappingProxyType({None: 352})
 
-    def __init__(self, images_dir: Path | None = None) -> None:
-        self.cvchess_root = get_config().cvchess_root
-        self.images_dir = Path(images_dir) if images_dir else self.cvchess_root / "images"
+    @staticmethod
+    def default_root() -> Path:
+        return get_config().cvchess_root
 
     def _load_samples(self, split: Split | None) -> list[BoardSample]:
-        labels = _load_labels(_labels_path(self.cvchess_root))
-        viewpoints = _load_viewpoints()
+        viewpoints = load_viewpoints()
         samples: list[BoardSample] = []
-        for entry in labels:
-            img_path = self.images_dir / entry["image"]
+        for entry in load_labels():
             sample_id = Path(entry["image"]).stem
             samples.append(
                 BoardSample(
-                    image_path=img_path,
+                    image_path=self.root / "images" / entry["image"],
                     board=Board.from_fen(entry["gt_fen"]),
-                    dataset=DatasetName.CVCHESS,
+                    dataset=self.name,
                     sample_id=sample_id,
                     meta={"gt_fen": entry["gt_fen"], "white_side": viewpoints.get(sample_id)},
                 )

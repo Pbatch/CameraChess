@@ -10,6 +10,8 @@ import hashlib
 from dataclasses import dataclass
 
 PIECE_SYMBOLS = "PNBRQKpnbrqk"
+# The names of the piece templates in a scene.blend, e.g. "White Knight"
+PIECE_NAMES = {"p": "Pawn", "n": "Knight", "b": "Bishop", "r": "Rook", "q": "Queen", "k": "King"}
 FILES = "abcdefgh"
 
 

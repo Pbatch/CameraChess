@@ -30,7 +30,6 @@ from camera_chess.chessqueries.data.transforms import build_transform
 from camera_chess.chessqueries.metrics import aggregate, aggregate_subsets
 from camera_chess.chessqueries.metrics.report import (
     eval_tag,
-    evaluation_inventory,
     print_evaluation_inventory,
     print_metrics,
     resolve_split,
@@ -170,7 +169,7 @@ def main() -> None:
     tag = eval_tag(args.dataset.value, split, sep="/")
     print_metrics(metrics, f"ChessQueries ({args.name}) on {tag} | n={len(predicted)}")
     assert ds.completeness is not None  # torch_dataset always records it
-    inventory = evaluation_inventory(ds.completeness, evaluated_samples=len(predicted))
+    inventory = ds.completeness.as_dict()
     print_evaluation_inventory(inventory)
 
     if args.subset_by:

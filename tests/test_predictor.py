@@ -1,15 +1,13 @@
 """Predictor turns arbitrary image paths into Boards: order preserved across
 batches, odd input modes (alpha/grayscale) coerced to RGB, records serialized."""
 
-import json
-
 import pytest
 import torch
 from PIL import Image
 
 from camera_chess.chessqueries.core import Board, Piece
 from camera_chess.chessqueries.models.base import BoardRecognizer
-from camera_chess.chessqueries.models.predictor import PAPER_RESOLUTION, Prediction, Predictor
+from camera_chess.chessqueries.models.predictor import PAPER_RESOLUTION, Predictor
 
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
@@ -90,16 +88,6 @@ def test_empty_input_short_circuits(boards):
     stub = StubRecognizer(boards)
     assert Predictor(stub, resolution=64).predict([]) == []
     assert stub.batch_shapes == []
-
-
-def test_prediction_record_is_json_serializable(tmp_path):
-    pred = Prediction(image_path=tmp_path / "x.jpg", board=Board.from_fen(START_FEN))
-
-    record = pred.to_record()
-    assert json.loads(json.dumps(record)) == record
-    assert record["fen"] == f"{START_FEN} w - - 0 1"
-    assert record["lichess_url"].endswith(START_FEN)
-    assert record["image"] == str(tmp_path / "x.jpg")
 
 
 def test_paper_resolution_is_the_shipped_default():

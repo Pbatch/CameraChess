@@ -113,7 +113,8 @@ class JointDataModule(pl.LightningDataModule):
     the concatenation of their val splits (one combined `val_board_acc` drives
     checkpointing). Per-domain test numbers come from `eval_cross_dataset.py`.
 
-    Sources must have an official TRAIN/VAL split (ChessReD, ChessCog). Held-out
+    Sources must have an official TRAIN split; a VAL split is used when they have
+    one (Yunker has none: its test is CameraChessWeb's tracker replay). Held-out
     distributions (e.g. CVChess) are deliberately excluded so they stay a clean
     zero-shot generalization target.
 
@@ -145,19 +146,24 @@ class JointDataModule(pl.LightningDataModule):
         train_parts, val_parts = [], []
         for name in self.sources:
             ds = get_dataset(name)
-            if Split.TRAIN not in ds.splits or Split.VAL not in ds.splits:
-                raise ValueError(f"{name.value} lacks TRAIN/VAL splits; cannot join-train on it.")
+            if Split.TRAIN not in ds.splits:
+                raise ValueError(f"{name.value} lacks a TRAIN split; cannot join-train on it.")
+            has_val = Split.VAL in ds.splits
             if self.gpu_augment is not None:
                 tf = square_uint8(self.resolution)
                 train_parts.append(ds.torch_dataset(Split.TRAIN, transform=tf, uint8=True))
-                val_parts.append(ds.torch_dataset(Split.VAL, transform=tf, uint8=True))
+                if has_val:
+                    val_parts.append(ds.torch_dataset(Split.VAL, transform=tf, uint8=True))
                 continue
             train_tf = build_transform(
                 self.resolution, train=True, augment=self.augment, normalization=self.normalization
             )
             val_tf = build_transform(self.resolution, train=False, normalization=self.normalization)
             train_parts.append(ds.torch_dataset(Split.TRAIN, transform=train_tf))
-            val_parts.append(ds.torch_dataset(Split.VAL, transform=val_tf))
+            if has_val:
+                val_parts.append(ds.torch_dataset(Split.VAL, transform=val_tf))
+        if not val_parts:
+            raise ValueError("No source has a VAL split, which checkpointing needs")
         self.train_ds = ConcatDataset(train_parts)
         self.val_ds = ConcatDataset(val_parts)
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from loguru import logger
 
 from camera_chess.chessqueries.core import Split
-from camera_chess.chessqueries.data.base import BoardSample, ChessDataset, DatasetCompleteness
+from camera_chess.chessqueries.data.base import BoardSample, ChessDataset
 
 
 def eval_tag(dataset_value: str, split: Split | None, sep: str = "_") -> str:
@@ -32,34 +32,16 @@ def print_metrics(metrics: dict, header: str) -> None:
     logger.info("\n".join([f"=== {header} ===", *rows]))
 
 
-def evaluation_inventory(
-    completeness: DatasetCompleteness,
-    *,
-    evaluated_samples: int | None = None,
-    expected_evaluated_samples: int | None = None,
-) -> dict:
-    """Serializable strict/partial-data status for an evaluation output."""
-    return completeness.as_dict(
-        evaluated_samples=evaluated_samples,
-        expected_evaluated_samples=expected_evaluated_samples,
-    )
-
-
 def print_evaluation_inventory(inventory: dict) -> None:
-    """Make strict, subset, and diagnostic partial runs unmistakable in logs."""
-    dataset = inventory.get("dataset") or "unknown"
-    split = inventory.get("split") or "all"
+    """Make diagnostic partial runs unmistakable in logs."""
+    split = inventory["split"] or "all"
     mode = inventory["mode"].upper()
-    paper_comparable = inventory["mode"] == "strict" and inventory["actual_samples"] == inventory["expected_samples"]
-    status = "PAPER-COMPARABLE" if paper_comparable else "NON-PAPER"
-    scope = inventory["scope"].replace("_", " ").upper()
+    status = "PAPER-COMPARABLE" if inventory["data_complete"] else "NON-PAPER"
     logger.info(
-        f"data {dataset}[{split}] [{mode}; {scope}; {status}]: "
+        f"data {inventory['dataset']}[{split}] [{mode}; {status}]: "
         f"expected={inventory['expected_samples']}  "
         f"labelled={inventory['labelled_samples']}  "
-        f"available={inventory['available_samples']}  "
-        f"requested={inventory['expected_evaluated_samples']}  "
-        f"evaluated={inventory['actual_samples']}"
+        f"available={inventory['available_samples']}"
     )
 
 

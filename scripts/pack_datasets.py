@@ -1,4 +1,4 @@
-"""Pack the training datasets (ChessReD, ChessCog, ChessCam, SLCC, synthetic) into one tar with smaller images.
+"""Pack the training datasets (ChessReD, ChessCog, ChessCam, SLCC, synthetic, Yunker) into one tar with smaller images.
 
 Images whose shorter side exceeds --max-side are shrunk to it (aspect kept) and every image is
 stored as JPEG, so the tar holds no more pixels than training at that resolution uses: the
@@ -36,6 +36,8 @@ DATASETS = {
     "chesscam": "chesscam",
     "slcc": "slcc/dataset",
     "synthetic": "synthetic_5k",
+    # Crops from camera_chess/videos/make_training_data.py; data/yunker holds the source videos
+    "yunker": "yunker_crops",
 }
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 

@@ -28,7 +28,6 @@ def test_piece_semantics():
     assert Piece.BLACK_QUEEN.symbol == "q"
     assert Piece.WHITE_KNIGHT.color is Color.WHITE
     assert Piece.BLACK_QUEEN.piece_type is PieceType.QUEEN
-    assert Piece.of(Color.BLACK, PieceType.ROOK) is Piece.BLACK_ROOK
     assert Piece.from_symbol("k") is Piece.BLACK_KING
     assert int(Piece.EMPTY) == 0
 

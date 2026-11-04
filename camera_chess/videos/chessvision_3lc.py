@@ -19,7 +19,6 @@ from loguru import logger
 
 from camera_chess.config import get_config
 
-ONNX_PATH = get_config().MODELS_ROOT / "chessvision_3lc_board_classifier.onnx"
 # Pixels per square side, as it was trained
 SQUARE = 64
 # Its classes, with 'f' for an empty square
@@ -33,8 +32,13 @@ MIN_CONFIDENCE = 0.5
 MIN_PROBABILITY = 1e-4
 
 
+def default_onnx_path():
+    return get_config().MODELS_ROOT / "chessvision_3lc_board_classifier.onnx"
+
+
 class SquareClassifier:
-    def __init__(self, onnx_path=ONNX_PATH):
+    def __init__(self, onnx_path=None):
+        onnx_path = onnx_path or default_onnx_path()
         import onnxruntime as ort
 
         # onnxruntime-gpu[cuda,cudnn] installs CUDA as pip packages, which it only finds once loaded
@@ -82,14 +86,14 @@ def export(pt_path):
     torch.onnx.export(
         BoardClassifier(model),
         (example,),
-        ONNX_PATH,
+        default_onnx_path(),
         input_names=["boards"],
         output_names=["labels", "log_probabilities"],
         dynamic_axes={name: {0: "n"} for name in ("boards", "labels", "log_probabilities")},
         opset_version=17,
         dynamo=False,
     )
-    logger.info(f"Saved {ONNX_PATH}")
+    logger.info(f"Saved {default_onnx_path()}")
 
 
 if __name__ == "__main__":

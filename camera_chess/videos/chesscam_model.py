@@ -12,17 +12,19 @@ TensorRT runs it in FP16, except for the layers that overflow FP16 (see build_en
 agrees with the PyTorch FP32 model on every square, with probabilities within 0.023, at about 5.6 ms a frame on an
 RTX 3060 laptop GPU (CUDA FP32: 12 ms).
 
-Usage: python -m camera_chess.videos.chesscam_model -d yunker/Br8Y3kCJRCs [-d ...] [--fps 8]
+Usage: python -m camera_chess.videos.chesscam_model -d yunker/Br8Y3kCJRCs [-d ...] [--fps 8] [--model name]
 Writes each dataset's probabilities as raw float32 (frames, 64, 13), gzipped, to chesscam_probs.f32.gz, which Node
 reads with zlib.gunzipSync and a Float32Array, and what they are to chesscam_probs.json. Frame n is at n / fps
 seconds. At a rate other than the app's 4 frames a second, the files are chesscam_probs_<fps>fps.*.
+
+--model runs another model exported the same way, <MODELS_ROOT>/<name>.onnx, to compare it with the app's in the
+replay. Its files are chesscam_probs_<name>.* (and chesscam_probs_<name>_<fps>fps.*), so the app's stay as they are.
 """
 
 import argparse
 import gzip
 import json
 import queue
-import subprocess
 import threading
 import time
 
@@ -32,12 +34,17 @@ import torch
 from loguru import logger
 
 from camera_chess.config import get_config
+from camera_chess.videos import ffmpeg
 from camera_chess.videos.config import load_config, video_path
 
-ONNX_PATH = get_config().MODELS_ROOT / "chessq-chesscam-dinov3-448.onnx"
-# The engine takes about a minute to build, so it is kept and reused. It only works on the GPU and TensorRT version
-# it was built with, so it is rebuilt if it fails to load, or if the ONNX model is newer.
-ENGINE_PATH = ONNX_PATH.with_suffix(".engine")
+
+def default_onnx_path(model=None):
+    """A model's ONNX file, by default the app's (CHESSCAM_MODEL in the settings). Its TensorRT engine, built next to it
+    as .engine, takes about a minute to build, so it is kept and reused. It only works on the GPU and TensorRT version it
+    was built with, so it is rebuilt if it fails to load, or if the ONNX model is newer."""
+    return get_config().MODELS_ROOT / f"{model or get_config().CHESSCAM_MODEL}.onnx"
+
+
 SIZE = 448
 # The app's classes, in the model's output order
 CLASSES = ".PNBRQKpnbrqk"
@@ -92,7 +99,9 @@ def build_engine(onnx_path):
 
 
 class ChessCamModel:
-    def __init__(self, onnx_path=ONNX_PATH, engine_path=ENGINE_PATH):
+    def __init__(self, onnx_path=None, engine_path=None):
+        onnx_path = onnx_path or default_onnx_path()
+        engine_path = engine_path or onnx_path.with_suffix(".engine")
         runtime = trt.Runtime(TRT_LOGGER)
         engine = None
         if engine_path.is_file() and engine_path.stat().st_mtime >= onnx_path.stat().st_mtime:
@@ -122,55 +131,26 @@ class ChessCamModel:
         return probs.numpy()
 
 
-def probs_name(fps):
-    """The base name of a dataset's probability files at a frame rate"""
-    return "chesscam_probs" if fps == FPS else f"chesscam_probs_{fps:g}fps"
+def probs_name(fps, model=None):
+    """The base name of a dataset's probability files at a frame rate, from the app's model unless another is named"""
+    name = "chesscam_probs" if model in (None, get_config().CHESSCAM_MODEL) else f"chesscam_probs_{model}"
+    return name if fps == FPS else f"{name}_{fps:g}fps"
 
 
 def read_frames(path, roi, fps=FPS):
     """Yields (time, SIZE x SIZE x 4 RGBA) of the 3D board region at fps, squashed to a square like the app does"""
-    x, y, w, h = roi
-    # Decoding is most of ffmpeg's work, and over half the frames are B-frames that no other frame needs, so up to 4
-    # frames a second they are skipped: the fps filter takes the nearest decoded frame instead, at most a frame or two
-    # (80 ms) away. Any faster, that would sometimes be the same frame twice.
-    skip = ["-skip_frame", "noref"] if fps <= FPS else []
-    cmd = [
-        "ffmpeg",
-        "-v",
-        "error",
-        *skip,
-        "-i",
-        path,
-        "-vf",
-        # exact=1, as on YUV 4:2:0 ffmpeg otherwise rounds the crop down to even sizes and offsets, while the app
-        # crops the exact region
-        f"fps={fps},crop={w}:{h}:{x}:{y}:exact=1,scale={SIZE}:{SIZE}:flags=area",
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        "rgba",
-        "-",
-    ]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    assert process.stdout is not None
-    size = SIZE * SIZE * 4
-    n = 0
-    while True:
-        raw = process.stdout.read(size)
-        if len(raw) < size:
-            break
-        yield n / fps, np.frombuffer(raw, np.uint8).reshape(SIZE, SIZE, 4)
-        n += 1
-    process.wait()
+    # Up to 4 frames a second B-frames are skipped, which puts each frame at most 80 ms from its time. Any faster, that
+    # would sometimes be the same frame twice. The crop is exact, as the app crops the exact region.
+    return ffmpeg.read_frames(path, roi, SIZE, fps, pix_fmt="rgba", scale="area", exact=True, skip_nonref=fps <= FPS)
 
 
-def save(dataset, probs, roi, fps=FPS):
+def save(dataset, probs, roi, fps=FPS, model=None):
     """Writes a dataset's (frames, 64, 13) probabilities, and what they are, for the replay"""
     d = get_config().DATA_ROOT / dataset
-    with gzip.open(d / f"{probs_name(fps)}.f32.gz", "wb") as f:
+    with gzip.open(d / f"{probs_name(fps, model)}.f32.gz", "wb") as f:
         f.write(np.ascontiguousarray(probs, dtype="<f4").tobytes())
     metadata = {
-        "model": ONNX_PATH.stem,
+        "model": model or get_config().CHESSCAM_MODEL,
         "shape": list(probs.shape),
         "dtype": "float32, little-endian",
         "fps": fps,
@@ -178,7 +158,7 @@ def save(dataset, probs, roi, fps=FPS):
         "classes": CLASSES,
         "roi": roi,
     }
-    (d / f"{probs_name(fps)}.json").write_text(json.dumps(metadata, indent=2))
+    (d / f"{probs_name(fps, model)}.json").write_text(json.dumps(metadata, indent=2))
 
 
 def read_batches(path, roi, fps=FPS):
@@ -209,24 +189,25 @@ def read_batches(path, roi, fps=FPS):
         raise errors[0]
 
 
-def run(dataset, model, fps=FPS):
+def run(dataset, model, fps=FPS, name=None):
     roi = load_config(dataset)["roi"]
     start = time.perf_counter()
     probs = np.concatenate([model.probabilities(batch) for batch in read_batches(video_path(dataset), roi, fps)])
-    save(dataset, probs, roi, fps)
+    save(dataset, probs, roi, fps, name)
     seconds = time.perf_counter() - start
     logger.info(f"{dataset}: {len(probs)} frames in {seconds:.1f}s ({len(probs) / seconds:.0f} frames/s)")
 
 
-def main(datasets, fps):
-    model = ChessCamModel()
+def main(datasets, fps, name=None):
+    model = ChessCamModel(default_onnx_path(name))
     for dataset in datasets:
-        run(dataset, model, fps)
+        run(dataset, model, fps, name)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", "-d", action="append", required=True)
     parser.add_argument("--fps", type=float, default=FPS)
+    parser.add_argument("--model", help="Another model's name, <MODELS_ROOT>/<name>.onnx, instead of the app's")
     args = parser.parse_args()
-    main(args.dataset, args.fps)
+    main(args.dataset, args.fps, args.model)

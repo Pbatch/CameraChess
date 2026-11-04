@@ -4,6 +4,7 @@ the dataset registry."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -24,6 +25,10 @@ class DatasetName(str, Enum):
     SLCC = "slcc"
     CHESSCAM = "chesscam"
     SYNTHETIC = "synthetic"
+    YUNKER = "yunker"
+    DIGITIZER = "digitizer"
+    FENIT = "fenit"
+    SAMRYAN = "samryan"
 
 
 @dataclass
@@ -70,38 +75,18 @@ class DatasetCompleteness:
             or bool(self.structural_issues)
         )
 
-    def as_dict(
-        self,
-        *,
-        evaluated_samples: int | None = None,
-        expected_evaluated_samples: int | None = None,
-    ) -> dict:
-        actual = self.available_samples if evaluated_samples is None else evaluated_samples
-        expected_evaluation = (
-            self.expected_samples if expected_evaluated_samples is None else expected_evaluated_samples
-        )
+    def as_dict(self) -> dict:
         return {
             "dataset": self.dataset.value,
             "split": self.split.value if self.split is not None else None,
             "mode": "allow_partial" if self.allow_partial else "strict",
-            "scope": ("full_split" if expected_evaluation == self.expected_samples else "explicit_subset"),
             "data_complete": not self.partial,
             "expected_samples": self.expected_samples,
-            "expected_evaluated_samples": expected_evaluation,
             "labelled_samples": self.labelled_samples,
             "available_samples": self.available_samples,
-            "actual_samples": actual,
             "missing_images": len(self.missing_sample_ids),
             "structural_issues": list(self.structural_issues),
         }
-
-
-@dataclass(frozen=True)
-class DatasetLoad:
-    """Validated samples together with the inventory used to admit them."""
-
-    samples: list[BoardSample]
-    completeness: DatasetCompleteness
 
 
 class BoardImageDataset(Dataset):
@@ -110,7 +95,8 @@ class BoardImageDataset(Dataset):
     With ``uint8``, images stay uint8 RGB for augmentation on the GPU
     (`camera_chess.chessqueries.data.gpu_augment`).
 
-    Every dataset reuses it via `ChessDataset.torch_dataset`.
+    Every dataset builds one via `ChessDataset.torch_dataset`, which also records
+    the split's `completeness`.
     """
 
     def __init__(
@@ -145,12 +131,19 @@ DATASET_REGISTRY: dict[DatasetName, type[ChessDataset]] = {}
 class ChessDataset(ABC):
     name: ClassVar[DatasetName]
     splits: ClassVar[tuple[Split, ...]] = ()  # () = no official split
-    expected_samples: dict[Split | None, int]  # an instance attribute where counts aren't frozen
+    expected_samples: Mapping[Split | None, int]  # frozen on the class for paper datasets, else set in __init__
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
         if getattr(cls, "name", None) is not None:
             DATASET_REGISTRY[cls.name] = cls
+
+    def __init__(self, root: Path | None = None) -> None:
+        self.root = Path(root) if root else self.default_root()
+
+    @staticmethod
+    @abstractmethod
+    def default_root() -> Path: ...
 
     @abstractmethod
     def _load_samples(self, split: Split | None) -> list[BoardSample]: ...
@@ -164,7 +157,14 @@ class ChessDataset(ABC):
     def _structural_issues(self) -> tuple[str, ...]:
         return ()
 
-    def load_with_report(self, split: Split | None = None, *, allow_partial: bool = False) -> DatasetLoad:
+    def torch_dataset(
+        self,
+        split: Split | None = None,
+        transform=None,
+        *,
+        allow_partial: bool = False,
+        uint8: bool = False,
+    ) -> BoardImageDataset:
         """Load a canonical split, refusing missing or unexpected records by default."""
         self._validate_split(split)
         labelled = self._load_samples(split)
@@ -209,21 +209,7 @@ class ChessDataset(ABC):
             logger.warning(
                 f"[allow_partial] {self.name.value}[{split_name}]: {detail}; paper-comparable evaluation is disabled"
             )
-        return DatasetLoad(available, completeness)
-
-    def load_samples(self, split: Split | None = None, *, allow_partial: bool = False) -> list[BoardSample]:
-        return self.load_with_report(split, allow_partial=allow_partial).samples
-
-    def torch_dataset(
-        self,
-        split: Split | None = None,
-        transform=None,
-        *,
-        allow_partial: bool = False,
-        uint8: bool = False,
-    ) -> BoardImageDataset:
-        loaded = self.load_with_report(split, allow_partial=allow_partial)
-        return BoardImageDataset(loaded.samples, transform, loaded.completeness, uint8=uint8)
+        return BoardImageDataset(available, transform, completeness, uint8=uint8)
 
 
 def get_dataset(name: DatasetName) -> ChessDataset:

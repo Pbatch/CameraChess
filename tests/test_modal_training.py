@@ -16,7 +16,8 @@ import torch
 pytest.importorskip("modal")
 pytest.importorskip("wandb")
 
-from camera_chess.chessqueries.train.training_job import ChessQueriesTrainingJob, TrainingConfig
+from camera_chess.chessqueries.models.chessqueries_model import HeadType
+from camera_chess.chessqueries.train.training_job import ChessQueriesTrainingJob, LrScaling, TrainingConfig
 from camera_chess.config import get_config
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "train_chessqueries_modal.py"
@@ -62,6 +63,7 @@ def test_training_submission_saves_call_id_without_waiting(tmp_path: Path, monke
         Mock(app_id="ap-test", get_dashboard_url=Mock(return_value="https://modal.com/id/ap-test")),
     )
     launcher.main(
+        dataset="/datasets/d.tar",
         run_name="vits-test",
         encoder="vit_small_patch14_dinov2.lvd142m",
         epochs=3,
@@ -85,6 +87,10 @@ def test_training_submission_saves_call_id_without_waiting(tmp_path: Path, monke
     assert submission["epochs"] == 3
     assert submission["batch_size"] == 16
     assert submission["gpu"] == "H100"
+    # Settings not passed are TrainingConfig's defaults, sent and saved in full
+    defaults = TrainingConfig("/datasets/d.tar", "vits-test")
+    assert config["learning_rate"] == submission["learning_rate"] == defaults.learning_rate
+    assert config["datasets"] == submission["datasets"] == defaults.datasets
 
 
 def test_bad_settings_fail_before_submitting(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -94,7 +100,7 @@ def test_bad_settings_fail_before_submitting(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(launcher, "ModalChessQueriesTrainer", _trainer_class(trainer))
     # Unfreezing at the default epoch 5 is impossible in a 3-epoch run
     with pytest.raises(ValueError, match="unfreeze"):
-        launcher.main(run_name="short", epochs=3)
+        launcher.main(dataset="/datasets/d.tar", run_name="short", epochs=3)
     trainer.train.spawn.assert_not_called()
     assert not (tmp_path / "data/modal-runs").exists()
 
@@ -124,7 +130,7 @@ def test_config_rejects_bad_settings(change: dict[str, Any]) -> None:
     [(6, "sqrt", 1.0), (24, "sqrt", 2.0), (24, "linear", 4.0), (24, "none", 1.0)],
 )
 def test_learning_rates_scale_from_the_paper_batch(batch_size: int, lr_scaling: str, factor: float) -> None:
-    config = TrainingConfig("/datasets/d.tar", "run", batch_size=batch_size, lr_scaling=lr_scaling)
+    config = TrainingConfig("/datasets/d.tar", "run", batch_size=batch_size, lr_scaling=LrScaling(lr_scaling))
     assert config.lr_factor() == pytest.approx(factor)
 
 
@@ -208,8 +214,10 @@ def test_evaluate_only_submits_the_evaluation(tmp_path: Path, monkeypatch: pytes
     monkeypatch.setattr(launcher, "app", Mock(app_id="ap", get_dashboard_url=Mock(return_value="url")))
 
     with pytest.raises(ValueError, match="init-weights"):
-        launcher.main(run_name="baseline", evaluate_only=True)
-    launcher.main(run_name="baseline", evaluate_only=True, init_weights="/weights/lite.safetensors")
+        launcher.main(dataset="/datasets/d.tar", run_name="baseline", evaluate_only=True)
+    launcher.main(
+        dataset="/datasets/d.tar", run_name="baseline", evaluate_only=True, init_weights="/weights/lite.safetensors"
+    )
 
     trainer.evaluate.spawn.assert_called_once()
     trainer.train.spawn.assert_not_called()
@@ -269,3 +277,11 @@ def test_resolution_follows_encoder_patch_size() -> None:
         TrainingConfig("/datasets/d.tar", "run", encoder=dinov3, resolution=644)
     with pytest.raises(ValueError, match="14px"):
         TrainingConfig("/datasets/d.tar", "run", encoder="vit_large_patch14_dinov2.lvd142m", resolution=640)
+
+
+def test_string_settings_become_enums_that_serialize_as_before() -> None:
+    settings: dict[str, Any] = {"augment": "photometric", "head_type": "linear", "lr_scaling": "linear"}
+    config = TrainingConfig("/datasets/d.tar", "run", **settings)
+    assert config.head_type is HeadType.LINEAR and config.lr_scaling is LrScaling.LINEAR
+    saved = json.loads(json.dumps(asdict(config)))
+    assert {key: saved[key] for key in settings} == settings

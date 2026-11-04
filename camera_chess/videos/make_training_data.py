@@ -20,6 +20,9 @@ Each crop is the 3D board region plus MARGIN on every side, as the region someon
 crop it again with random margins. The 2D overlay shows the answer, so the top margin stops short of it, and any part
 of it still inside a crop (where it overlaps the board region itself) is blacked out.
 
+A promotion marked `[%pawn_left]` in gt.pgn (see camera_chess.videos.overlay_moves) is labelled as the pawn left on
+its square, until the pawn was swapped for the new piece, or until the square next changes.
+
 The games scored by the tracker replay in CameraChessWeb (data/yunker/benchmark.txt) are never used.
 
 Usage: python -m camera_chess.videos.make_training_data -d yunker/D81hFXZ0Cp4 [-d ...] [--out data/yunker_crops]
@@ -42,10 +45,8 @@ from PIL import Image
 
 from camera_chess.config import get_config
 from camera_chess.videos.config import load_config, video_path
+from camera_chess.videos.overlay_moves import read_pawns_left
 
-# Not data/yunker, which holds the source videos: the output folder is deleted and rebuilt on each run
-OUT_DIR = get_config().DATA_ROOT / "yunker_crops"
-BENCHMARK_PATH = get_config().DATA_ROOT / "yunker" / "benchmark.txt"
 # The app model's classes, in the order chesscam_probs holds them
 CLASSES = ".PNBRQKpnbrqk"
 # Seconds the board changes after the overlay shows a move (negative: before), from --measure-offset: on 3339 moves of
@@ -84,10 +85,11 @@ def load_probs(dataset):
 
 
 def load_game(dataset):
+    """The game in overlay_moves.json, with `pawns_left` from gt.pgn"""
     games = json.loads((get_config().DATA_ROOT / dataset / "overlay_moves.json").read_text())
     if len(games) != 1:
         raise ValueError(f"{dataset} has {len(games)} games; overlay_moves cuts such videos into a dataset per game")
-    return games[0]
+    return {**games[0], "pawns_left": read_pawns_left(dataset)}
 
 
 def labels(board):
@@ -100,13 +102,36 @@ def labels(board):
 
 
 def positions(game):
-    """(board, start, end) for each position after a move, in video seconds, with the board as it stood"""
+    """(board, start, end) for each position after a move, in video seconds, with the board as it stood: a promotion
+    in game["pawns_left"] ({move index: second it was swapped, or None}) shows the pawn on its square until then, or
+    until a later move changes that square. A position the swap falls in is split in two there."""
     times = [t + OFFSET for t in game["times"]]
+    pawns_left = game.get("pawns_left", {})
     board = chess.Board()
     out = []
-    for move, start, end in zip(game["moves"], times, [*times[1:], times[-1] + LEAD_OUT]):
-        board.push_uci(move)
-        out.append((board.copy(), start, end))
+    # The square a pawn was left on, and when it was swapped (None: not until the square changes)
+    pawn, swapped = None, None
+    for i, (move, start, end) in enumerate(zip(game["moves"], times, [*times[1:], times[-1] + LEAD_OUT])):
+        move = chess.Move.from_uci(move)
+        if pawn is not None and pawn in (move.from_square, move.to_square):
+            pawn = None
+        if i in pawns_left:
+            pawn, swapped = move.to_square, pawns_left[i]
+        color = board.turn
+        board.push(move)
+        if pawn is None or (swapped is not None and swapped <= start):
+            pawn = None
+            out.append((board.copy(), start, end))
+            continue
+        stood = board.copy()
+        # Past the promotion, the square holds the pawn left on it
+        owner = color if i in pawns_left else stood.piece_at(pawn).color  # ty: ignore[unresolved-attribute]
+        stood.set_piece_at(pawn, chess.Piece(chess.PAWN, owner))
+        if swapped is not None and swapped < end:
+            out += [(stood, start, swapped), (board.copy(), swapped, end)]
+            pawn = None
+        else:
+            out.append((stood, start, end))
     return out
 
 
@@ -114,10 +139,11 @@ def frame_times(game):
     """(board, time) of the frames to use: up to PER_POSITION spread over each position's time away from moves, then
     at most MAX_FRAMES spread over the game"""
     chosen = []
-    for board, start, end in positions(game):
-        # The last position has no move after it
+    stood = positions(game)
+    for i, (board, start, end) in enumerate(stood):
+        # The last position has no move after it. A swap of a pawn left on the board is a hand on it, as a move is.
         low = start + AFTER
-        high = end - BEFORE if board.ply() < len(game["moves"]) else end
+        high = end - BEFORE if i < len(stood) - 1 else end
         if high - low < MIN_STAND:
             continue
         chosen += [(board, t) for t in np.linspace(low, high, PER_POSITION + 2)[1:-1]]
@@ -235,8 +261,12 @@ def measure_offset(datasets):
     )
 
 
+def benchmark_path():
+    return get_config().DATA_ROOT / "yunker" / "benchmark.txt"
+
+
 def main(datasets, out_dir):
-    benchmark = {f"yunker/{line.strip()}" for line in BENCHMARK_PATH.read_text().splitlines() if line.strip()}
+    benchmark = {f"yunker/{line.strip()}" for line in benchmark_path().read_text().splitlines() if line.strip()}
     if used := [d for d in datasets if d in benchmark or d.split("_game_")[0] in benchmark]:
         raise ValueError(f"{used} are scored by the tracker replay, so must not be trained on")
     if out_dir.exists():
@@ -251,7 +281,8 @@ def main(datasets, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", "-d", action="append", required=True)
-    parser.add_argument("--out", type=Path, default=OUT_DIR)
+    # Not data/yunker, which holds the source videos: the output folder is deleted and rebuilt on each run
+    parser.add_argument("--out", type=Path, default=get_config().DATA_ROOT / "yunker_crops")
     parser.add_argument("--measure-offset", action="store_true")
     args = parser.parse_args()
     if args.measure_offset:

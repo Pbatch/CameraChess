@@ -8,16 +8,13 @@ Usage: python -m camera_chess.videos.roi_labeller [--port 8000], then open http:
 
 import argparse
 import json
-import re
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote
 
-import yaml
 from loguru import logger
 
 from camera_chess.config import get_config
-from camera_chess.videos.config import CONFIG_PATH, load_all
+from camera_chess.local_server import LocalHandler, serve
+from camera_chess.videos.config import config_path, load_all, save_all
 
 PAGE_PATH = Path(__file__).with_name("roi_labeller.html")
 ROI_KEYS = ("roi", "overlay_roi")
@@ -59,90 +56,41 @@ def save_labels(dataset, labels):
         d["unusable"] = True
     elif labels.get("unusable") is False:
         d.pop("unusable", None)
-    CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False))
+    save_all(config)
     logger.info(f"Saved {dataset}: { ({k: d.get(k) for k in (*ROI_KEYS, 'unusable')}) }")
 
 
-class Handler(SimpleHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass
-
-    def _send_json(self, data, status=200):
-        body = json.dumps(data).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _send_video(self, path):
-        # Browsers only seek in a video served with byte ranges
-        size = path.stat().st_size
-        start, end = 0, size - 1
-        match = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
-        if match:
-            if match.group(1):
-                start = int(match.group(1))
-                end = int(match.group(2)) if match.group(2) else end
-            else:
-                start = size - int(match.group(2))
-        end = min(end, size - 1)
-        self.send_response(206 if match else 200)
-        self.send_header("Content-Type", "video/mp4" if path.suffix == ".mp4" else "video/webm")
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Content-Length", str(end - start + 1))
-        if match:
-            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-        self.end_headers()
-        with path.open("rb") as f:
-            f.seek(start)
-            remaining = end - start + 1
-            try:
-                while remaining > 0:
-                    chunk = f.read(min(1 << 20, remaining))
-                    if not chunk:
-                        break
-                    self.wfile.write(chunk)
-                    remaining -= len(chunk)
-            except (BrokenPipeError, ConnectionResetError):
-                pass
-
+class Handler(LocalHandler):
     def do_GET(self):
-        if self.path == "/":
-            body = PAGE_PATH.read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        elif self.path == "/api/videos":
-            self._send_json([{k: v for k, v in video.items() if k != "path"} for video in find_videos()])
-        elif self.path.startswith("/video/"):
-            dataset = unquote(self.path[len("/video/") :])
+        path = self.route
+        if path == "/":
+            self.send_page(PAGE_PATH)
+        elif path == "/api/videos":
+            self.send_json([{k: v for k, v in video.items() if k != "path"} for video in find_videos()])
+        elif path.startswith("/video/"):
+            dataset = path[len("/video/") :]
             paths = {video["dataset"]: video["path"] for video in find_videos()}
             if dataset not in paths:
                 self.send_error(404)
                 return
-            self._send_video(paths[dataset])
+            self.send_video(paths[dataset])
         else:
             self.send_error(404)
 
     def do_POST(self):
-        if self.path != "/api/labels":
+        if self.route != "/api/labels":
             self.send_error(404)
             return
-        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        body = self.read_json()
         if body["dataset"] not in {video["dataset"] for video in find_videos()}:
             self.send_error(404)
             return
         save_labels(body["dataset"], body)
-        self._send_json({"ok": True})
+        self.send_json({"ok": True})
 
 
 def main(port):
-    server = ThreadingHTTPServer(("localhost", port), Handler)
-    logger.info(f"Labelling {len(find_videos())} videos at http://localhost:{port}, saving to {CONFIG_PATH}")
-    server.serve_forever()
+    serve(Handler, port, f"Labelling {len(find_videos())} videos, saving to {config_path()}", host="localhost")
 
 
 if __name__ == "__main__":

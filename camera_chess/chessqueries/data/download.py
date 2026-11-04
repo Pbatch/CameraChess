@@ -18,8 +18,10 @@ import requests
 from loguru import logger
 from tqdm import tqdm
 
+from camera_chess.chessqueries.data import digitizer, fenit, samryan
 from camera_chess.chessqueries.data.base import DatasetName
-from camera_chess.chessqueries.data.inventory import FROZEN_SAMPLE_COUNTS
+from camera_chess.chessqueries.data.chesscog import ChessCog
+from camera_chess.chessqueries.data.chessred import ChessReD
 from camera_chess.config import get_config
 
 # --- ChessReD (4TU.ResearchData) ------------------------------------------- #
@@ -32,16 +34,14 @@ CHESSRED_ANNOTATIONS_SHA256 = "16e99d7e8535c0fc56507caa2aa5f7594d7ca076ebab3f5a4
 # was trained on, the only ones that reproduce the paper, and what we train our
 # own models on too. See upstream issue tmasouris/end-to-end-chess-recognition#5.
 CHESSRED_IMAGES_GDRIVE_ID = "1jxmFxjOy0qefdCZ_x3DMNtsvAK4LojEw"
-CHESSRED_IMAGE_COUNT = sum(FROZEN_SAMPLE_COUNTS[DatasetName.CHESSRED].values())
+CHESSRED_IMAGE_COUNT = sum(ChessReD.expected_samples.values())
 
 # --- ChessCog (OSF) --------------------------------------------------------- #
 # Synthetic render dataset, OSF project "xf3ka". Stored as val.zip, test.zip and
 # a SPLIT archive train.zip + train.z01 (must be merged before unzip). Mirrors
 # chesscog's own chesscog.data_synthesis.download_dataset.
 CHESSCOG_OSF_PROJECT = "xf3ka"
-CHESSCOG_SPLIT_COUNTS = {
-    split.value: count for split, count in FROZEN_SAMPLE_COUNTS[DatasetName.CHESSCOG].items() if split is not None
-}
+CHESSCOG_SPLIT_COUNTS = {split.value: count for split, count in ChessCog.expected_samples.items() if split is not None}
 
 # --- CVChess (Google Drive folder) ----------------------------------------- #
 CVCHESS_GDRIVE_FOLDER_ID = "1lxS3GpYvDLU_1a9oqzIRlNmJUSYbmGZp"
@@ -286,24 +286,15 @@ def download_chesscog(dataroot: Path | None = None) -> Path:
 
 
 def download_cvchess(dataroot: Path | None = None) -> Path:
-    """Seed CVChess into the standard layout: ``data/cvchess/{images/, annotations.json}``.
+    """Prepare ``data/cvchess/images/``. The labels are vendored in the package.
 
     The CVChess Drive folder has >50 files, which exceeds gdown's web-scraping
     limit (listing needs the authenticated Drive API), so the **images must be
-    downloaded manually**. This function seeds ``annotations.json`` from the
-    vendored labels and tells you where to drop the images.
+    downloaded manually**. This function tells you where to drop them.
     """
-    from camera_chess.chessqueries.data.cvchess import VENDORED_LABELS
-
     dataroot = Path(dataroot) if dataroot else get_config().cvchess_root
     images_dir = dataroot / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
-
-    # Seed annotations.json (alongside images, like the other datasets).
-    ann = dataroot / "annotations.json"
-    if not ann.exists():
-        shutil.copy(VENDORED_LABELS, ann)
-        logger.info(f"  [seed] annotations.json -> {ann}")
 
     n_images = len(list(images_dir.glob("*.jpg")))
     if n_images == 0:
@@ -311,12 +302,26 @@ def download_cvchess(dataroot: Path | None = None) -> Path:
             "CVChess images must be downloaded manually (Drive folder has >50 files,\n"
             "which defeats gdown). Download from\n"
             f"  https://drive.google.com/drive/folders/{CVCHESS_GDRIVE_FOLDER_ID}\n"
-            f"and place the IMG_*.jpg files in:\n  {images_dir}\n"
-            "Annotations are already in place."
+            f"and place the IMG_*.jpg files in:\n  {images_dir}"
         )
     else:
         logger.info(f"  [ok] {n_images} images present in {images_dir}")
     return dataroot
+
+
+def download_digitizer(dataroot: Path | None = None) -> Path:
+    """Download the Realtime-Chess-Digitizer games and build their crops and labels."""
+    return digitizer.build(dataroot)
+
+
+def download_fenit(dataroot: Path | None = None) -> Path:
+    """Download the Fenit photos (Mendeley Data) and build their crops and labels."""
+    return fenit.build(dataroot)
+
+
+def download_samryan(dataroot: Path | None = None) -> Path:
+    """Download samryan18/chess-dataset (GitHub) and build its crops and labels."""
+    return samryan.build(dataroot)
 
 
 # Downloadable datasets (SLCC is reconstructed with the upstream tooling, ChessCam built elsewhere).
@@ -324,4 +329,7 @@ DATASETS = {
     DatasetName.CHESSRED: download_chessred,
     DatasetName.CHESSCOG: download_chesscog,
     DatasetName.CVCHESS: download_cvchess,
+    DatasetName.DIGITIZER: download_digitizer,
+    DatasetName.FENIT: download_fenit,
+    DatasetName.SAMRYAN: download_samryan,
 }

@@ -42,9 +42,8 @@ import numpy as np
 from mathutils import Euler, Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from positions import assign_split, read_positions, square_name
-
-PIECE_NAMES = {"p": "Pawn", "n": "Knight", "b": "Bishop", "r": "Rook", "q": "Queen", "k": "King"}
+from blender import look_at, setup_device
+from positions import PIECE_NAMES, assign_split, read_positions, square_name
 
 
 # Lathe profiles as (radius, height) in square widths, bottom to top
@@ -495,11 +494,6 @@ class LoadedScene:
 # -- camera, lights, rendering --------------------------------------------------
 
 
-def look_at(location: Vector, target: Vector, roll: float = 0.0) -> Matrix:
-    rot = (target - location).to_track_quat("-Z", "Y").to_matrix().to_4x4()
-    return Matrix.Translation(location) @ rot @ Matrix.Rotation(roll, 4, "Z")
-
-
 class LightRig:
     def __init__(self, scene: bpy.types.Scene) -> None:
         def add(name, kind):
@@ -583,28 +577,6 @@ class LightRig:
         self.background.inputs["Strength"].default_value = ambient
         info["ambient"] = ambient
         return info
-
-
-def setup_device(scene: bpy.types.Scene, device: str) -> str:
-    scene.render.engine = "CYCLES"
-    if device.upper() == "CPU":
-        scene.cycles.device = "CPU"
-        return "CPU"
-    prefs = bpy.context.preferences.addons["cycles"].preferences
-    backends = ["OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"] if device == "auto" else [device.upper()]
-    for backend in backends:
-        try:
-            prefs.compute_device_type = backend
-        except TypeError:
-            continue
-        prefs.get_devices()
-        gpus = [d for d in prefs.devices if d.type == backend]
-        if gpus:
-            for d in prefs.devices:
-                d.use = d.type == backend
-            scene.cycles.device = "GPU"
-            return f"{backend}: " + ", ".join(d.name for d in gpus)
-    raise SystemExit(f"Cycles found no GPU for {backends}; pass --device CPU to render on the CPU")
 
 
 def setup_render(scene: bpy.types.Scene, args: argparse.Namespace) -> None:

@@ -23,17 +23,13 @@ go through them one video at a time, in frame order, instead of most confident f
 from __future__ import annotations
 
 import argparse
-import json
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote
 
 import cv2
 import numpy as np
 import orjson
-from loguru import logger
 from PIL import Image
 from tqdm import tqdm
 
@@ -47,11 +43,11 @@ from camera_chess.labels.frames import (
     rotate,
     to_fen,
 )
+from camera_chess.local_server import LocalHandler, save_json, serve
 
-ROOT = get_config().labels_root
-DATASET = get_config().DATA_ROOT / "chesscam"
-PREDICTIONS = ROOT / "test_predictions_lite_ft_chesscam.json"
-VERDICTS = ROOT / "test_label_review.json"
+# In the labels folder
+PREDICTIONS = "test_predictions_lite_ft_chesscam.json"
+VERDICTS = "test_label_review.json"
 # The make_chessqueries_dataset.py defaults the dataset was built with
 ANCHOR_RATIO, MARGIN = 1 / 3, 0.5
 
@@ -86,11 +82,11 @@ def square_polygon(inv: np.ndarray, index: int, k: int) -> list[list[float]]:
     return cv2.perspectiveTransform(corners[None], inv)[0].astype(float).round(1).tolist()
 
 
-def piece_boxes(frame, k: int) -> list[dict]:
+def piece_boxes(frame, k: int, root: Path) -> list[dict]:
     """The labelled piece boxes, with the square (FEN index) each was put on, or None if off the board"""
     with Image.open(frame.image) as im:
         width, height = im.size
-    classes, boxes = read_yolo(ROOT / "pieces" / frame.split / "labels" / f"{frame.name}.txt", width, height)
+    classes, boxes = read_yolo(root / "pieces" / frame.split / "labels" / f"{frame.name}.txt", width, height)
     if not len(boxes):
         return []
     anchors = np.stack(
@@ -109,21 +105,24 @@ def piece_boxes(frame, k: int) -> list[dict]:
 
 
 def build_items(
+    root: Path,
+    dataset: Path,
     chessq_preds: Path | None = None,
     chessq_probs: Path | None = None,
     min_p_model: float | None = None,
     by_video: bool = False,
 ) -> list[dict]:
-    predictions = orjson.loads(PREDICTIONS.read_bytes())
+    predictions = orjson.loads((root / PREDICTIONS).read_bytes())
     annotations = {
         Path(a["image"]).stem: a
-        for a in orjson.loads((DATASET / "annotations.json").read_bytes())
+        for a in orjson.loads((dataset / "annotations.json").read_bytes())
         if a["split"] == "test"
     }
-    groups = orjson.loads((DATASET / "groups.json").read_bytes())
+    groups = orjson.loads((dataset / "groups.json").read_bytes())
     chessq = orjson.loads(chessq_preds.read_bytes()) if chessq_preds else {}
     probs = orjson.loads(chessq_probs.read_bytes()) if chessq_probs else None
-    prior = orjson.loads(VERDICTS.read_bytes()) if chessq and VERDICTS.exists() else {}
+    lite_verdicts = root / VERDICTS
+    prior = orjson.loads(lite_verdicts.read_bytes()) if chessq and lite_verdicts.exists() else {}
     items: list[dict[str, Any]] = []
     for name, p in tqdm(predictions.items()):
         label = fen_squares(annotations[name]["fen"])
@@ -138,7 +137,7 @@ def build_items(
         group = annotation["group"]
         report = groups[group]
         k = report.get("manual_rotation", report.get("model_rotation", report["prior_rotation"]))
-        frame = load_frame(name, group.split("/")[0], ROOT, ANCHOR_RATIO, MARGIN)
+        frame = load_frame(name, group.split("/")[0], root, ANCHOR_RATIO, MARGIN)
         # The grid must reproduce the dataset's label, or the outlines would point at the wrong square
         rebuilt = (
             frame
@@ -149,7 +148,7 @@ def build_items(
         if frame is None or rebuilt != annotation["fen"]:
             raise ValueError(f"{name} no longer rebuilds to its dataset label")
         inv = np.linalg.inv(frame.H)
-        a1, boxes = square_polygon(inv, 56, k), piece_boxes(frame, k)
+        a1, boxes = square_polygon(inv, 56, k), piece_boxes(frame, k, root)
         for index in diff:
             square = "abcdefgh"[index % 8] + str(8 - index // 8)
             # An earlier Lite verdict on this square and label, shown as a hint
@@ -188,53 +187,39 @@ def build_items(
     return items
 
 
-class Handler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, items_json: bytes, verdicts: Path, **kwargs):
+class Handler(LocalHandler):
+    def __init__(self, *args, items_json: bytes, verdicts: Path, dataset: Path, **kwargs):
         self.items_json = items_json
         self.verdicts = verdicts
-        super().__init__(*args, directory=str(ROOT), **kwargs)
-
-    def _send(self, body: bytes, content_type: str = "application/json") -> None:
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self.dataset = dataset
+        super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:
-        path = unquote(self.path.split("?")[0])
+        path = self.route
         if path == "/":
-            self._send((Path(__file__).parent / "review_test_labels.html").read_bytes(), "text/html; charset=utf-8")
+            self.send_page(Path(__file__).with_name("review_test_labels.html"))
         elif path == "/items.json":
-            self._send(self.items_json)
+            self.send(self.items_json)
         elif path == "/verdicts.json":
-            self._send(self.verdicts.read_bytes() if self.verdicts.exists() else b"{}")
+            self.send(self.verdicts.read_bytes() if self.verdicts.exists() else b"{}")
         elif path.startswith("/img/images/test/"):
-            image = DATASET / "images" / "test" / Path(path).name
-            if image.is_file():
-                self._send(image.read_bytes(), "image/jpeg")
-            else:
-                self.send_error(404)
+            self.send_file(self.dataset / "images" / "test" / Path(path).name, "image/jpeg")
         else:
             self.send_error(404)
 
     def do_POST(self) -> None:
-        if self.path != "/verdicts":
+        if self.route != "/verdicts":
             self.send_error(404)
             return
-        verdicts = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        tmp = self.verdicts.with_suffix(".tmp")
-        tmp.write_text(json.dumps(verdicts, indent=1, sort_keys=True))
-        tmp.replace(self.verdicts)
-        self._send(b'{"ok": true}')
-
-    def log_message(self, format: str, *args) -> None:
-        pass
+        save_json(self.verdicts, self.read_json())
+        self.send_json({"ok": True})
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument("--root", type=Path, default=get_config().labels_root)
+    parser.add_argument("--dataset", type=Path, default=get_config().chesscam_root)
     parser.add_argument(
         "--chessq-preds",
         type=Path,
@@ -258,19 +243,19 @@ def main() -> None:
         action="store_true",
         help="Keep frames of one video together and in order, rather than sorting by confidence",
     )
-    parser.add_argument("--verdicts", type=Path, default=VERDICTS)
+    parser.add_argument("--verdicts", type=Path, help=f"Default: {VERDICTS} in --root")
     args = parser.parse_args()
-    if args.chessq_preds and args.verdicts.resolve() == VERDICTS.resolve():
+    lite_verdicts = args.root / VERDICTS
+    args.verdicts = args.verdicts or lite_verdicts
+    if args.chessq_preds and args.verdicts.resolve() == lite_verdicts.resolve():
         parser.error("--chessq-preds needs its own --verdicts file")
     if args.chessq_probs and not args.chessq_preds:
         parser.error("--chessq-probs needs --chessq-preds")
     if args.min_p_model is not None and not args.chessq_probs:
         parser.error("--min-p-model needs --chessq-probs")
-    items = build_items(args.chessq_preds, args.chessq_probs, args.min_p_model, args.by_video)
-    handler = partial(Handler, items_json=orjson.dumps(items), verdicts=args.verdicts)
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    logger.info(f"Reviewing {len(items)} squares at http://127.0.0.1:{args.port} (verdicts in {args.verdicts})")
-    server.serve_forever()
+    items = build_items(args.root, args.dataset, args.chessq_preds, args.chessq_probs, args.min_p_model, args.by_video)
+    handler = partial(Handler, items_json=orjson.dumps(items), verdicts=args.verdicts, dataset=args.dataset)
+    serve(handler, args.port, f"Reviewing {len(items)} squares (verdicts in {args.verdicts})")
 
 
 if __name__ == "__main__":

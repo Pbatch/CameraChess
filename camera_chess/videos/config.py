@@ -4,13 +4,20 @@ import yaml
 
 from camera_chess.config import get_config
 
-CONFIG_PATH = get_config().DATA_ROOT / "video_config.yaml"
+
+def config_path():
+    return get_config().DATA_ROOT / "video_config.yaml"
 
 
 def load_all():
-    if not CONFIG_PATH.is_file():
+    path = config_path()
+    if not path.is_file():
         return {}
-    return yaml.safe_load(CONFIG_PATH.read_text()) or {}
+    return yaml.safe_load(path.read_text()) or {}
+
+
+def save_all(config):
+    config_path().write_text(yaml.safe_dump(config, sort_keys=False))
 
 
 def load_config(dataset):

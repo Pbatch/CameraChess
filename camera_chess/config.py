@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     OUTPUTS_ROOT: Path = REPO_ROOT / "outputs"
     # Exported models the video tools run (ONNX and TensorRT engines).
     MODELS_ROOT: Path = REPO_ROOT / "models"
+    # The folder under DATA_ROOT of the synthetic renders trained on (camera_chess/synthetic/render.py --out)
+    SYNTHETIC_SET: str = "synthetic_5k"
+    # The app's model, as <MODELS_ROOT>/<name>.onnx, that camera_chess/videos/chesscam_model.py runs
+    CHESSCAM_MODEL: str = "chessq-chesscam-dinov3-448"
 
     @property
     def labels_root(self) -> Path:
@@ -45,9 +49,29 @@ class Settings(BaseSettings):
         return self.DATA_ROOT / "chesscam"
 
     @property
+    def yunker_root(self) -> Path:
+        # Crops of YunkerChess videos labelled from their 2D overlay (camera_chess/videos/make_training_data.py)
+        return self.DATA_ROOT / "yunker_crops"
+
+    @property
+    def digitizer_root(self) -> Path:
+        # Crops built from the Realtime-Chess-Digitizer games (camera_chess/chessqueries/data/digitizer.py)
+        return self.DATA_ROOT / "digitizer"
+
+    @property
+    def fenit_root(self) -> Path:
+        # Crops built from the Fenit photos on Mendeley Data (camera_chess/chessqueries/data/fenit.py)
+        return self.DATA_ROOT / "fenit"
+
+    @property
+    def samryan_root(self) -> Path:
+        # Crops built from samryan18/chess-dataset (camera_chess/chessqueries/data/samryan.py)
+        return self.DATA_ROOT / "samryan"
+
+    @property
     def synthetic_root(self) -> Path:
         # Renders from camera_chess/synthetic/render.py; data/synthetic holds only the FEN lists they came from
-        return self.DATA_ROOT / "synthetic_5k"
+        return self.DATA_ROOT / self.SYNTHETIC_SET
 
 
 @lru_cache(maxsize=1)

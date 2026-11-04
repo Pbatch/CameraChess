@@ -61,11 +61,6 @@ def score_board(pred: BoardLike, gt: BoardLike) -> BoardMetrics:
     )
 
 
-def count_wrong_squares(pred: BoardLike, gt: BoardLike) -> int:
-    """Number of squares that differ = edits a human needs to fix the board."""
-    return score_board(pred, gt).n_wrong
-
-
 def aggregate(
     preds: Sequence[BoardLike],
     gts: Sequence[BoardLike],
@@ -138,53 +133,3 @@ def aggregate_subsets(
         for key, idx in sorted(by_group.items())
     }
     return {"overall": aggregate(preds, gts, tolerances), "subsets": subsets}
-
-
-class ErrorDecomposition:
-    """Streaming, mutually-exclusive per-square error split over (B,64) label
-    batches: **occupancy** errors (empty <-> piece) vs **piece-type** errors (both
-    occupied, wrong piece). Also accumulates the per-square wrong counts for
-    error-localization heatmaps. Accepts torch tensors or numpy arrays."""
-
-    def __init__(self) -> None:
-        self.occ_wrong = 0  # empty <-> piece confusions
-        self.piece_wrong = 0  # both occupied, wrong piece
-        self.occupied = 0  # truly-occupied squares seen
-        self.n_boards = 0
-        self.wrong_per_square = [0] * 64
-
-    def update(self, preds, labels) -> None:
-        pe, ge = preds == EMPTY, labels == EMPTY
-        wrong = preds != labels
-        self.occ_wrong += int((pe != ge).sum())
-        self.piece_wrong += int((wrong & ~pe & ~ge).sum())
-        self.occupied += int((~ge).sum())
-        self.n_boards += len(labels)
-        per_square = wrong.sum(0)
-        for i in range(64):
-            self.wrong_per_square[i] += int(per_square[i])
-
-    @property
-    def n_squares(self) -> int:
-        return 64 * self.n_boards
-
-    @property
-    def occupancy_error(self) -> float:
-        return self.occ_wrong / self.n_squares
-
-    @property
-    def piece_type_error(self) -> float:
-        return self.piece_wrong / self.n_squares
-
-    @property
-    def per_square_error(self) -> float:
-        return (self.occ_wrong + self.piece_wrong) / self.n_squares
-
-    @property
-    def piece_error_given_occupied(self) -> float:
-        return self.piece_wrong / max(self.occupied, 1)
-
-    @property
-    def per_square_error_rates(self) -> list[float]:
-        """(64,) any-error rate per square, for heatmaps."""
-        return [w / self.n_boards for w in self.wrong_per_square]

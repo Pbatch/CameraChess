@@ -3,26 +3,32 @@
 Needs the local Modal tooling (the `modal` group, installed by default), which also lets the launcher check
 the settings before submitting. Upload the packed datasets (scripts/pack_datasets.py) once:
 
-    .venv/bin/modal volume put chessqueries-training dist/chessqueries-data.tar /datasets/chessqueries-data.tar
+    .venv/bin/modal volume put chessqueries-training dist/chessqueries-data-v8.tar /datasets/chessqueries-data-v8.tar
 
 then submit a run (DINOv3 ViT-S/16 at 448px by default), which returns as soon as it is queued:
 
-    .venv/bin/modal run --detach -m scripts.train_chessqueries_modal --run-name dinov3-s-448-chesscam
+    .venv/bin/modal run --detach -m scripts.train_chessqueries_modal \
+        --dataset /datasets/chessqueries-data-v8.tar --run-name dinov3-s-448-yunker
+
+Every setting not passed takes TrainingConfig's default (camera_chess/chessqueries/train/training_job.py), the
+only place they are set; the run's full settings are saved under data/modal-runs/.
 
 Fine-tune released weights uploaded to the volume (the run's encoder must match them; the
 resolution may differ), or just score them on the test splits as a baseline with --evaluate-only:
 
-    .venv/bin/modal run --detach -m scripts.train_chessqueries_modal --run-name lite-ft \
-        --encoder vit_small_patch14_dinov2.lvd142m --resolution 644 --unfreeze-epoch 0 \
+    .venv/bin/modal run --detach -m scripts.train_chessqueries_modal \
+        --dataset /datasets/chessqueries-data-v8.tar --run-name lite-ft --encoder vit_small_patch14_dinov2.lvd142m --resolution 644 --unfreeze-epoch 0 \
         --init-weights /weights/cq-vit-s-644-v4-seed2-safetensors-fp16-r2.safetensors
 
 Resume a stopped run from its last checkpoint with the same run name and settings:
 
-    .venv/bin/modal run --detach -m scripts.train_chessqueries_modal --run-name dinov3-s-448-chesscam \
-        --resume-checkpoint /runs/dinov3-s-448-chesscam/checkpoints/last.ckpt
+    .venv/bin/modal run --detach -m scripts.train_chessqueries_modal \
+        --dataset /datasets/chessqueries-data-v8.tar --run-name dinov3-s-448-yunker \
+        --resume-checkpoint /runs/dinov3-s-448-yunker/checkpoints/last.ckpt
 """
 
 import json
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -86,33 +92,33 @@ class ModalChessQueriesTrainer:
 
 @app.local_entrypoint()
 def main(
-    dataset: str = "/datasets/chessqueries-data.tar",
-    run_name: str = "dinov3-s-448-chesscam",
-    epochs: int = 45,
-    batch_size: int = 16,
-    lr_scaling: str = "sqrt",
-    resume_checkpoint: str = "",
-    precision: str = "bf16-mixed",
-    resolution: int = 448,
-    encoder: str = "vit_small_patch16_dinov3.lvd1689m",
-    datasets: str = "chessred,chesscog,chesscam,slcc,synthetic",
-    learning_rate: float = 1.4e-4,
-    encoder_learning_rate: float = 1.4e-5,
-    warmup_epochs: int = 3,
-    unfreeze_epoch: int = 5,
-    seed: int = 1,
-    init_weights: str = "",
-    eval_datasets: str = "chesscam,chessred,chesscog,slcc",
-    gpu_augment: bool = True,
+    # The packed datasets on the volume, e.g. /datasets/chessqueries-data-v8.tar
+    dataset: str,
+    run_name: str,
+    # Settings left out take TrainingConfig's defaults, so they are only set there
+    epochs: int | None = None,
+    batch_size: int | None = None,
+    lr_scaling: str | None = None,
+    resume_checkpoint: str | None = None,
+    precision: str | None = None,
+    resolution: int | None = None,
+    encoder: str | None = None,
+    datasets: str | None = None,
+    learning_rate: float | None = None,
+    encoder_learning_rate: float | None = None,
+    warmup_epochs: int | None = None,
+    unfreeze_epoch: int | None = None,
+    seed: int | None = None,
+    init_weights: str | None = None,
+    eval_datasets: str | None = None,
+    gpu_augment: bool | None = None,
+    wandb_project: str | None = None,
+    wandb_entity: str | None = None,
     evaluate_only: bool = False,
     # Any Modal GPU type, e.g. A100-80GB
     gpu: str = "H100",
-    wandb_project: str = "chessqueries",
-    wandb_entity: str = "",
 ) -> None:
-    config: dict[str, Any] = {
-        "dataset": dataset,
-        "run_name": run_name,
+    settings: dict[str, Any] = {
         "epochs": epochs,
         "batch_size": batch_size,
         "lr_scaling": lr_scaling,
@@ -132,9 +138,11 @@ def main(
         "wandb_project": wandb_project,
         "wandb_entity": wandb_entity,
     }
-    # Fail here rather than after a GPU has spun up
-    TrainingConfig(**config)
-    if evaluate_only and not init_weights:
+    # Checked here rather than after a GPU has spun up, and sent and saved in full, defaults included
+    config: dict[str, Any] = asdict(
+        TrainingConfig(dataset=dataset, run_name=run_name, **{k: v for k, v in settings.items() if v is not None})
+    )
+    if evaluate_only and not config["init_weights"]:
         raise ValueError("--evaluate-only scores --init-weights, so pass them")
     submission_dir = Path("data/modal-runs")
     submission_dir.mkdir(parents=True, exist_ok=True)

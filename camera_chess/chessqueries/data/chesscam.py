@@ -16,23 +16,27 @@ class ChessCam(ChessDataset):
     name = DatasetName.CHESSCAM
     splits = (Split.TRAIN, Split.VAL, Split.TEST)
 
-    def __init__(self, dataroot: Path | None = None) -> None:
-        self.dataroot = Path(dataroot) if dataroot else get_config().chesscam_root
-        self.annotations_path = self.dataroot / "annotations.json"
-        if not self.annotations_path.is_file():
-            raise FileNotFoundError(f"{self.annotations_path} not found; build it with make_chessqueries_dataset.py")
-        self._annotations = json.loads(self.annotations_path.read_text())
+    def __init__(self, root: Path | None = None) -> None:
+        super().__init__(root)
+        annotations_path = self.root / "annotations.json"
+        if not annotations_path.is_file():
+            raise FileNotFoundError(f"{annotations_path} not found; build it with make_chessqueries_dataset.py")
+        self._annotations = json.loads(annotations_path.read_text())
         # Not frozen like the paper datasets: the conversion decides the counts
         counts = Counter(a["split"] for a in self._annotations)
         self.expected_samples = {split: counts[split.value] for split in self.splits}
+
+    @staticmethod
+    def default_root() -> Path:
+        return get_config().chesscam_root
 
     def _load_samples(self, split: Split | None) -> list[BoardSample]:
         assert split is not None  # _validate_split requires one
         return [
             BoardSample(
-                image_path=self.dataroot / a["image"],
+                image_path=self.root / a["image"],
                 board=Board.from_fen(a["fen"]),
-                dataset=DatasetName.CHESSCAM,
+                dataset=self.name,
                 sample_id=Path(a["image"]).stem,
                 split=split,
                 meta={"group": a["group"], "model_agreement": a.get("model_agreement")},

@@ -48,10 +48,10 @@ processes, pass `--start`/`--end` ranges of FEN lines.
 ## Output
 
 The output uses ChessCog's layout, `<out>/render/<split>/<line>.{jpg,json}`,
-so `ChessCog(dataroot=Path("data/synthetic"))` reads it. Strict loading checks
-sample counts against ChessCog's frozen inventory, so pass
-`allow_partial=True` to `load_with_report`. To train on the renders as their
-own domain, add a dataset class for them.
+and the `synthetic` dataset (`camera_chess.chessqueries.data.synthetic.Synthetic`)
+reads it from `DATA_ROOT/<SYNTHETIC_SET>` (default `synthetic_5k`; set
+`SYNTHETIC_SET` in `.env` to train on another render run). It counts its
+samples from the labels on disk rather than checking them against ChessCog's.
 
 Splits come from a hash of the piece placement (default 90/3/7). A position
 that appears twice in the FEN list therefore always lands in the same split.

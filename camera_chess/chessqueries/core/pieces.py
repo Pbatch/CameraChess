@@ -90,11 +90,6 @@ class Piece(IntEnum):
         return letter if self.color is Color.WHITE else letter.lower()
 
     @classmethod
-    def of(cls, color: Color, piece_type: PieceType) -> Piece:
-        base = 1 + _ORDER.index(piece_type)
-        return cls(base + (0 if color is Color.WHITE else 6))
-
-    @classmethod
     def from_symbol(cls, symbol: str) -> Piece:
         try:
             return _SYMBOL_TO_PIECE[symbol]
