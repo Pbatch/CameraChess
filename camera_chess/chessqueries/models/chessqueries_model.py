@@ -14,6 +14,7 @@ from torch.nn import functional as F
 
 from camera_chess.chessqueries.core import ALL_SQUARES, NUM_PIECES, Color, Piece, PieceType
 from camera_chess.chessqueries.models.base import BoardRecognizer
+from camera_chess.chessqueries.models.decoder import QueryDecoder
 
 
 class HeadType(str, Enum):
@@ -123,8 +124,7 @@ class ChessQueriesModel(BoardRecognizer):
         # and spatial correspondence is kept.
         if self.head_type is HeadType.QUERY:
             self.queries = SquareQueries(dim)
-            layer = nn.TransformerDecoderLayer(d_model=dim, nhead=nheads, dim_feedforward=4 * dim, batch_first=True)
-            self.decoder = nn.TransformerDecoder(layer, num_layers=decoder_layers)
+            self.decoder = QueryDecoder(dim, nheads, decoder_layers, ff_dim=4 * dim)
         self.norm = nn.LayerNorm(dim)
         self.head = nn.Linear(dim, NUM_CLASSES)  # shared across all 64 squares
 
@@ -158,11 +158,21 @@ class ChessQueriesModel(BoardRecognizer):
             h = pooled.flatten(2).transpose(1, 2)  # (B, 64, dim), FEN order a8..h1
             return self.norm(h)
         q = self.queries(x.shape[0])  # (B, 64, dim)
-        h = self.decoder(q, memory)  # (B, 64, dim)
+        h, _ = self.decoder(q, memory)  # (B, 64, dim)
         return self.norm(h)  # (B, 64, dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.head(self.features(x))  # (B, 64, 13)
+
+    def forward_with_attention(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Logits and where each square looked: the last decoder layer's cross-attention weights,
+        averaged over heads, (B, 64, tokens) with the encoder's prefix tokens first"""
+        if self.head_type is not HeadType.QUERY:
+            raise ValueError("Only the query head has attention weights")
+        q = self.queries(x.shape[0])
+        h, weights = self.decoder(q, self.encode(x), need_weights=True)
+        assert weights is not None
+        return self.head(self.norm(h)), weights
 
     def forward_aux(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         """Main + auxiliary logits (training only). Main is the same tensor

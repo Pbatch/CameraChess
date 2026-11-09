@@ -40,3 +40,19 @@ def test_head_type_accepts_checkpoint_strings():
     must normalize it to the enum."""
     m = ChessQueriesModel(pretrained=False, freeze_encoder=True, head_type="linear")
     assert m.head_type is HeadType.LINEAR
+
+
+def test_forward_with_attention_matches_forward():
+    m = ChessQueriesModel(pretrained=False, freeze_encoder=True).eval()
+    with torch.no_grad():
+        logits, weights = m.forward_with_attention(_X)
+        torch.testing.assert_close(logits, m(_X))
+    tokens = m.encoder.num_prefix_tokens + (98 // 14) ** 2
+    assert weights.shape == (2, 64, tokens)
+    torch.testing.assert_close(weights.sum(-1), torch.ones(2, 64))
+
+
+def test_forward_with_attention_needs_query_head():
+    m = ChessQueriesModel(pretrained=False, freeze_encoder=True, head_type="linear")
+    with pytest.raises(ValueError):
+        m.forward_with_attention(_X)

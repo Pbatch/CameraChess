@@ -133,8 +133,6 @@ def main() -> None:
     model = BrowserModel(recognizer.to(dtype), dtype).cuda().eval()
     dummy = torch.zeros(1, resolution, resolution, 4, device="cuda")
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    # The decoder's fused MultiheadAttention kernel has no ONNX op
-    torch.backends.mha.set_fastpath_enabled(False)
     with torch.no_grad():
         torch.onnx.export(
             model,
