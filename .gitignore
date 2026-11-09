@@ -1,12 +1,12 @@
-backup
-data
-nyh
-label_studio
-sparseml
-debug
-blender
-models
-segmentation
+/backup/
+/data/
+/nyh/
+/label_studio/
+/sparseml/
+/debug/
+/blender/
+/models/
+/segmentation/
 
 *.tar.gz
 *.jpg
@@ -16,3 +16,13 @@ segmentation
 .venv/
 
 **/__pycache__/
+
+# ChessQueries training: checkpoints, eval outputs and packed datasets
+/checkpoints/
+/outputs/
+/dist/
+*.ckpt
+*.pth
+
+.env
+.pytest_cache/
