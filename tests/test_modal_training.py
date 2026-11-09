@@ -278,6 +278,10 @@ def test_resolution_follows_encoder_patch_size() -> None:
         TrainingConfig("/datasets/d.tar", "run", encoder=dinov3, resolution=644)
     with pytest.raises(ValueError, match="14px"):
         TrainingConfig("/datasets/d.tar", "run", encoder="vit_large_patch14_dinov2.lvd142m", resolution=640)
+    # A CNN's input is a multiple of its total stride
+    TrainingConfig("/datasets/d.tar", "run", encoder="mobilenetv4_conv_small.e2400_r224_in1k", resolution=448)
+    with pytest.raises(ValueError, match="32px"):
+        TrainingConfig("/datasets/d.tar", "run", encoder="mobilenetv4_conv_small.e2400_r224_in1k", resolution=440)
 
 
 def test_string_settings_become_enums_that_serialize_as_before() -> None:

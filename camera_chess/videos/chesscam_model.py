@@ -45,6 +45,7 @@ def default_onnx_path(model=None):
     return get_config().MODELS_ROOT / f"{model or get_config().CHESSCAM_MODEL}.onnx"
 
 
+# The app's model's input size; another model's is read from its engine
 SIZE = 448
 # The app's classes, in the model's output order
 CLASSES = ".PNBRQKpnbrqk"
@@ -112,15 +113,17 @@ class ChessCamModel:
             engine_path.write_bytes(serialized)
             engine = runtime.deserialize_cuda_engine(serialized)
         self.engine = engine
+        # (BATCH, size, size, 4): the input size the model was exported at, e.g. 644 for ChessQ Lite
+        self.size = engine.get_tensor_shape("image")[1]
         self.context = engine.create_execution_context()
         self.stream = torch.cuda.Stream()
-        self.images = torch.empty((BATCH, SIZE, SIZE, 4), dtype=torch.uint8, device="cuda")
+        self.images = torch.empty((BATCH, self.size, self.size, 4), dtype=torch.uint8, device="cuda")
         self.probs = torch.empty((BATCH, 64, len(CLASSES)), dtype=torch.float32, device="cuda")
         self.context.set_tensor_address("image", self.images.data_ptr())
         self.context.set_tensor_address("probs", self.probs.data_ptr())
 
     def probabilities(self, images):
-        """(N, 64, 13) probabilities from up to BATCH (N, SIZE, SIZE, 4) uint8 RGBA images"""
+        """(N, 64, 13) probabilities from up to BATCH (N, size, size, 4) uint8 RGBA images"""
         n = len(images)
         with torch.cuda.stream(self.stream):
             self.images[:n].copy_(torch.from_numpy(images), non_blocking=True)
@@ -137,11 +140,11 @@ def probs_name(fps, model=None):
     return name if fps == FPS else f"{name}_{fps:g}fps"
 
 
-def read_frames(path, roi, fps=FPS):
-    """Yields (time, SIZE x SIZE x 4 RGBA) of the 3D board region at fps, squashed to a square like the app does"""
+def read_frames(path, roi, fps=FPS, size=SIZE):
+    """Yields (time, size x size x 4 RGBA) of the 3D board region at fps, squashed to a square like the app does"""
     # Up to 4 frames a second B-frames are skipped, which puts each frame at most 80 ms from its time. Any faster, that
     # would sometimes be the same frame twice. The crop is exact, as the app crops the exact region.
-    return ffmpeg.read_frames(path, roi, SIZE, fps, pix_fmt="rgba", scale="area", exact=True, skip_nonref=fps <= FPS)
+    return ffmpeg.read_frames(path, roi, size, fps, pix_fmt="rgba", scale="area", exact=True, skip_nonref=fps <= FPS)
 
 
 def save(dataset, probs, roi, fps=FPS, model=None):
@@ -161,8 +164,8 @@ def save(dataset, probs, roi, fps=FPS, model=None):
     (d / f"{probs_name(fps, model)}.json").write_text(json.dumps(metadata, indent=2))
 
 
-def read_batches(path, roi, fps=FPS):
-    """Yields (up to BATCH, SIZE, SIZE, 4) batches of frames, read on a thread, so ffmpeg keeps decoding while the
+def read_batches(path, roi, fps=FPS, size=SIZE):
+    """Yields (up to BATCH, size, size, 4) batches of frames, read on a thread, so ffmpeg keeps decoding while the
     model runs instead of waiting on a full pipe"""
     batches = queue.Queue(maxsize=4)
     errors = []
@@ -170,7 +173,7 @@ def read_batches(path, roi, fps=FPS):
     def read():
         try:
             batch = []
-            for _, frame in read_frames(path, roi, fps):
+            for _, frame in read_frames(path, roi, fps, size):
                 batch.append(frame)
                 if len(batch) == BATCH:
                     batches.put(np.stack(batch))
@@ -192,7 +195,9 @@ def read_batches(path, roi, fps=FPS):
 def run(dataset, model, fps=FPS, name=None):
     roi = load_config(dataset)["roi"]
     start = time.perf_counter()
-    probs = np.concatenate([model.probabilities(batch) for batch in read_batches(video_path(dataset), roi, fps)])
+    probs = np.concatenate(
+        [model.probabilities(batch) for batch in read_batches(video_path(dataset), roi, fps, model.size)]
+    )
     save(dataset, probs, roi, fps, name)
     seconds = time.perf_counter() - start
     logger.info(f"{dataset}: {len(probs)} frames in {seconds:.1f}s ({len(probs) / seconds:.0f} frames/s)")

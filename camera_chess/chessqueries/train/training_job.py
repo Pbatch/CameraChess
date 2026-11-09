@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import tarfile
 import tempfile
 from collections.abc import Callable
@@ -35,7 +34,7 @@ from camera_chess.chessqueries.models.checkpoint import (
     load_safetensors_model,
     read_safetensors_metadata,
 )
-from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel, HeadType
+from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel, HeadType, encoder_stride
 from camera_chess.chessqueries.train.lit import JointDataModule, LitChessQueriesModel, Schedule
 from camera_chess.chessqueries.train.training_logging import create_wandb_logger
 from camera_chess.config import get_config
@@ -120,8 +119,8 @@ class TrainingConfig:
             raise ValueError("Use a simple run name")
         if self.precision not in PRECISIONS:
             raise ValueError(f"Precision must be one of {sorted(PRECISIONS)}")
-        if self.resolution % self.patch_size():
-            raise ValueError(f"Resolution must be a multiple of the encoder's {self.patch_size()}px patch size")
+        if self.resolution % encoder_stride(self.encoder):
+            raise ValueError(f"Resolution must be a multiple of the encoder's {encoder_stride(self.encoder)}px stride")
         if not 0 < self.learning_rate < float("inf") or not 0 < self.encoder_learning_rate < float("inf"):
             raise ValueError("Learning rates must be positive and finite")
         if not 0 <= self.unfreeze_epoch < self.epochs:
@@ -130,13 +129,6 @@ class TrainingConfig:
         self.eval_sources()
         if self.all_splits and set(self.sources()) & set(self.eval_sources()):
             raise ValueError("With all_splits the test splits are trained on, so evaluate only on other datasets")
-
-    def patch_size(self) -> int:
-        """From the timm name, e.g. 14 for DINOv2's vit_*_patch14_*, 16 for DINOv3's vit_*_patch16_*"""
-        match = re.search(r"patch(\d+)", self.encoder)
-        if match is None:
-            raise ValueError(f"Can't tell the patch size of {self.encoder}")
-        return int(match.group(1))
 
     def sources(self) -> tuple[DatasetName, ...]:
         return tuple(DatasetName(name.strip()) for name in self.datasets.split(",") if name.strip())

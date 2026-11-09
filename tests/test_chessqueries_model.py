@@ -56,3 +56,29 @@ def test_forward_with_attention_needs_query_head():
     m = ChessQueriesModel(pretrained=False, freeze_encoder=True, head_type="linear")
     with pytest.raises(ValueError):
         m.forward_with_attention(_X)
+
+
+CNN = "mobilenetv4_conv_small.e2400_r224_in1k"
+
+
+def test_cnn_encoder_feeds_the_query_decoder():
+    m = ChessQueriesModel(CNN, pretrained=False, freeze_encoder=False).eval()
+    x = torch.rand(2, 3, 128, 128)
+    with torch.no_grad():
+        memory = m.encode(x)
+        out = m(x)
+    # Stride-16 (8x8) and stride-32 (4x4) maps, projected to one width
+    assert memory.shape == (2, 64 + 16, m.level_emb.embedding_dim)
+    assert out.shape == (2, 64, 13)
+
+
+def test_cnn_memory_projection_trains_with_a_frozen_encoder():
+    m = ChessQueriesModel(CNN, pretrained=False, freeze_encoder=True)
+    m(torch.rand(1, 3, 64, 64)).sum().backward()
+    assert m.memory_proj[0].weight.grad is not None
+    assert all(p.grad is None for p in m.encoder.parameters())
+
+
+def test_cnn_encoder_rejects_the_linear_head():
+    with pytest.raises(ValueError, match="query head"):
+        ChessQueriesModel(CNN, pretrained=False, head_type="linear")

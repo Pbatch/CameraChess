@@ -48,7 +48,7 @@ from loguru import logger
 
 from camera_chess.chessqueries.models.browser import RGBANormalize, bake_pos_embed
 from camera_chess.chessqueries.models.checkpoint import load_safetensors_model, read_safetensors_metadata
-from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel
+from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel, sine_positions
 from camera_chess.chessqueries.models.decoder import QueryDecoderLayer
 
 # The WebGPU delegate (LiteRT.js 2.5.3 and 2.6.0) fails to compile a model with more than 7
@@ -83,7 +83,7 @@ class ReferenceModel(nn.Module):
         super().__init__()
         self.recognizer = recognizer
         self.register_buffer("grid_xy", grid_xy)
-        self.num_prefix_tokens = recognizer.encoder.num_prefix_tokens
+        self.num_prefix_tokens = recognizer.encoder.num_prefix_tokens if recognizer.is_vit else 0
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         logits, weights = self.recognizer.forward_with_attention(x)
@@ -181,24 +181,32 @@ class ChessQueries2D(nn.Module):
     grid_xy: torch.Tensor
     rope_sin: torch.Tensor
     rope_cos: torch.Tensor
+    cnn_pos: torch.Tensor
     first_x: torch.Tensor
     first_scores_weight: torch.Tensor
     first_scores_bias: torch.Tensor
 
-    def __init__(self, recognizer: ChessQueriesModel, grid_xy: torch.Tensor) -> None:
+    def __init__(self, recognizer: ChessQueriesModel, grid_xy: torch.Tensor, resolution: int) -> None:
         super().__init__()
         self.encoder = recognizer.encoder
-        # Patch centres in [0, 1] input coordinates, (patches, 2)
+        self.is_vit = recognizer.is_vit
+        self.num_prefix_tokens = self.encoder.num_prefix_tokens if self.is_vit else 0
+        # Patch (or CNN cell) centres in [0, 1] input coordinates, (patches, 2)
         self.register_buffer("grid_xy", grid_xy)
         self.norm, self.head = recognizer.norm, recognizer.head
         self.decoder_layers = cast(Sequence[QueryDecoderLayer], recognizer.decoder.layers)
-        for block in self.encoder.blocks:
-            attn = block.attn
-            assert isinstance(attn.q_norm, nn.Identity) and isinstance(attn.k_norm, nn.Identity)
-            assert isinstance(getattr(attn, "norm", nn.Identity()), nn.Identity)
-        self.rope = getattr(self.encoder, "rope", None) is not None
-        if self.rope:
-            self.register_rope_tables(grid_xy.shape[0])
+        self.rope = False
+        if self.is_vit:
+            for block in self.encoder.blocks:
+                attn = block.attn
+                assert isinstance(attn.q_norm, nn.Identity) and isinstance(attn.k_norm, nn.Identity)
+                assert isinstance(getattr(attn, "norm", nn.Identity()), nn.Identity)
+            self.rope = getattr(self.encoder, "rope", None) is not None
+            if self.rope:
+                self.register_rope_tables(grid_xy.shape[0])
+        else:
+            self.memory_proj = recognizer.memory_proj
+            self.register_cnn_positions(recognizer, resolution)
         # Set by fit_fp16: the residual stream is divided by residual_scale, and the attention
         # scores of the blocks in score_shrink are computed shrunk (see attention)
         self.residual_scale = 1.0
@@ -235,6 +243,19 @@ class ChessQueries2D(nn.Module):
         prefix = enc.num_prefix_tokens
         self.register_buffer("rope_sin", F.pad(sin.repeat(1, heads), (0, 0, prefix, 0)))
         self.register_buffer("rope_cos", F.pad(cos.repeat(1, heads), (0, 0, prefix, 0), value=1.0))
+
+    @torch.no_grad()
+    def register_cnn_positions(self, recognizer: ChessQueriesModel, resolution: int) -> None:
+        """A CNN's memory adds sine position codes plus a level embedding, constant for a fixed
+        input size, so they are one (tokens, C) table"""
+        maps = self.encoder(torch.zeros(1, 3, resolution, resolution))
+        tables = []
+        projections = cast(Sequence[nn.Conv2d], self.memory_proj)
+        for level, (proj, fmap) in enumerate(zip(projections, maps, strict=True)):
+            _, _, h, w = fmap.shape
+            d = proj.out_channels
+            tables.append(sine_positions(h, w, d, fmap.device) + recognizer.level_emb.weight[level])
+        self.register_buffer("cnn_pos", torch.cat(tables))
 
     def rotate(self, t: torch.Tensor, heads: int) -> torch.Tensor:
         """Rotate-half RoPE on (N, C) queries or keys, split into heads on a 3D view"""
@@ -276,7 +297,18 @@ class ChessQueries2D(nn.Module):
             q, k = self.rotate(q, attn.num_heads), self.rotate(k, attn.num_heads)
         return q, k, v
 
+    def encode_cnn(self, x: torch.Tensor) -> torch.Tensor:
+        tokens = []
+        for proj, fmap in zip(self.memory_proj, self.encoder(x), strict=True):
+            m = proj(fmap)
+            tokens.append(m.reshape(m.shape[1], -1).transpose(0, 1))  # (h*w, C)
+        memory = torch.cat(tokens)
+        # As one row: the delegate lays out a constant (N, C) operand of an add wrongly
+        return (memory.reshape(1, -1) + self.cnn_pos.reshape(1, -1)).reshape(memory.shape)
+
     def encode(self, x: torch.Tensor) -> torch.Tensor:
+        if not self.is_vit:
+            return self.encode_cnn(x)
         enc = self.encoder
         unscaled = [i for i in range(len(enc.blocks)) if i not in self.score_shrink]
         fused = set(unscaled[:MAX_FUSED_ATTENTION])
@@ -298,6 +330,8 @@ class ChessQueries2D(nn.Module):
         """Choose residual_scale and score_shrink so that, on `x`, LayerNorm inputs' sums of squares
         and attention scores stay below FP16_LIMIT. DINOv2 needs neither; DINOv3 needs both"""
         assert self.residual_scale == 1.0 and not self.score_shrink
+        if not self.is_vit:
+            return  # no residual stream or self-attention scores to fit
         enc = self.encoder
 
         def sum_squares(h: torch.Tensor) -> float:
@@ -355,7 +389,7 @@ class ChessQueries2D(nn.Module):
                 h, weights = layer(h, memory, need_weights=i == last)
         assert weights is not None
         # Prefix (CLS/register) tokens have no position, so they are left out and the rest renormalised
-        w = weights[:, self.encoder.num_prefix_tokens :]
+        w = weights[:, self.num_prefix_tokens :]
         centroids = torch.matmul(w, self.grid_xy) / w.sum(-1, keepdim=True)  # (64, 2)
         return self.head(self.norm(h)), centroids  # (64, 13), (64, 2)
 
@@ -389,11 +423,18 @@ def build_model(ckpt: Path) -> tuple[BrowserModel, int]:
     """The browser wrapper around the checkpoint, attention rewritten for the GPU delegate."""
     resolution = int(read_safetensors_metadata(ckpt)["resolution"])
     recognizer = load_safetensors_model(ckpt, device="cpu").float()
-    grid = bake_pos_embed(recognizer.encoder, resolution)
-    centres = (torch.arange(grid, dtype=torch.float32) + 0.5) / grid
-    ys, xs = torch.meshgrid(centres, centres, indexing="ij")
-    grid_xy = torch.stack([xs.flatten(), ys.flatten()], dim=-1)  # row-major, as the patch tokens
-    rewritten = ChessQueries2D(recognizer, grid_xy)
+    if recognizer.is_vit:
+        grids = [bake_pos_embed(recognizer.encoder, resolution)]
+    else:
+        # The CNN memory is the stride-16 map's cells, then the stride-32 map's (coarsest last)
+        grids = [resolution // r for r in recognizer.encoder.feature_info.reduction()]
+    cells = []
+    for grid in grids:
+        centres = (torch.arange(grid, dtype=torch.float32) + 0.5) / grid
+        ys, xs = torch.meshgrid(centres, centres, indexing="ij")
+        cells.append(torch.stack([xs.flatten(), ys.flatten()], dim=-1))  # row-major, as the tokens
+    grid_xy = torch.cat(cells)
+    rewritten = ChessQueries2D(recognizer, grid_xy, resolution)
     model = BrowserModel(rewritten).eval()
     reference = BrowserModel(ReferenceModel(recognizer, grid_xy)).eval()
 
