@@ -31,8 +31,16 @@ def attention(
 
     Heads are split on one extra dimension, so 2D inputs never go above 3D: (heads, N, d).
     With need_weights, also returns the (..., N, M) attention weights averaged over heads,
-    before dropout."""
+    before dropout.
+
+    Batched inputs without need_weights (training) use PyTorch's fused kernel, as
+    nn.MultiheadAttention does: about a third faster than this for the decoder, with less
+    memory. 2D inputs (the LiteRT export) always take the explicit form."""
     d = q.shape[-1] // heads
+    if q.dim() > 2 and not need_weights:
+        qh, kh, vh = (t.unflatten(-1, (heads, d)).transpose(-3, -2) for t in (q, k, v))
+        out = F.scaled_dot_product_attention(qh, kh, vh, dropout_p=dropout_p, scale=d**-0.5)
+        return out.transpose(-3, -2).flatten(-2), None
     qh = (q * d**-0.5).unflatten(-1, (heads, d)).transpose(-3, -2)  # (..., H, N, d)
     kh = k.unflatten(-1, (heads, d)).movedim(-3, -1)  # (..., H, d, M)
     vh = v.unflatten(-1, (heads, d)).transpose(-3, -2)  # (..., H, M, d)
