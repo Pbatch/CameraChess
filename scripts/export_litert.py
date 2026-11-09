@@ -49,6 +49,7 @@ from loguru import logger
 from camera_chess.chessqueries.models.browser import RGBANormalize, bake_pos_embed
 from camera_chess.chessqueries.models.checkpoint import load_safetensors_model, read_safetensors_metadata
 from camera_chess.chessqueries.models.chessqueries_model import ChessQueriesModel
+from camera_chess.chessqueries.models.decoder import QueryDecoderLayer
 
 # The WebGPU delegate (LiteRT.js 2.5.3 and 2.6.0) fails to compile a model with more than 7
 # attention composites ("STABLEHLO_COMPOSITE failed to prepare"), so only the first 7 encoder
@@ -83,20 +84,10 @@ class ReferenceModel(nn.Module):
         self.recognizer = recognizer
         self.register_buffer("grid_xy", grid_xy)
         self.num_prefix_tokens = recognizer.encoder.num_prefix_tokens
-        last = recognizer.decoder.layers[-1]
-        self.weights: list[torch.Tensor] = []
-
-        def mha(x, mem, attn_mask, key_padding_mask, is_causal=False):
-            out, w = last.multihead_attn(x, mem, mem, need_weights=True, average_attn_weights=True)
-            self.weights.append(w)
-            return last.dropout2(out)
-
-        last._mha_block = mha
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        self.weights.clear()
-        logits = self.recognizer(x)
-        w = self.weights[0][0, :, self.num_prefix_tokens :]
+        logits, weights = self.recognizer.forward_with_attention(x)
+        w = weights[0, :, self.num_prefix_tokens :]
         return logits[0], (w @ self.grid_xy) / w.sum(-1, keepdim=True)
 
 
@@ -106,13 +97,12 @@ def attention(
     v: torch.Tensor,
     heads: int,
     scale: float,
-    need_weights: bool = False,
     shrink: float = 1.0,
-) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
-    """Multi-head attention on 2D (N, C) queries and (M, C) keys/values, all heads at once on
-    3D (heads, tokens, d) tensors, so no tensor goes above 3D (the delegate rejects
-    timm/PyTorch's 5D split). About 20% less GPU time than one matmul per head channel slice.
-    With need_weights, also returns the (N, M) attention weights averaged over heads.
+) -> torch.Tensor:
+    """Encoder multi-head attention on 2D (N, C) queries and (M, C) keys/values, all heads at
+    once on 3D (heads, tokens, d) tensors, so no tensor goes above 3D (the delegate rejects
+    timm's 5D split). About 20% less GPU time than one matmul per head channel slice. (The
+    decoder's own attention is already in this form.)
 
     With shrink, the scores are computed divided by it, for scores beyond fp16's range (DINOv3's
     first block reaches millions), then grown back after subtracting each row's max. Scores far
@@ -128,8 +118,7 @@ def attention(
     if shrink != 1.0:
         scores = (scores - scores.amax(-1, keepdim=True)).clamp(min=-FP16_LIMIT / shrink) * shrink
     probs = torch.softmax(scores, dim=-1)
-    out = torch.matmul(probs, vh).transpose(0, 1).reshape(n, c)
-    return (out, probs.mean(0)) if need_weights else out
+    return torch.matmul(probs, vh).transpose(0, 1).reshape(n, c)
 
 
 def fused_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, heads: int, scale: float) -> torch.Tensor:
@@ -171,54 +160,16 @@ def power_of_two_above(ratio: float) -> float:
     return 2.0 ** max(0, math.ceil(math.log2(ratio))) if ratio > 0 else 1.0
 
 
-class InProjection(nn.Module):
-    """The q/k/v projections of an nn.MultiheadAttention as separate linear maps."""
-
-    q_weight: torch.Tensor
-    q_bias: torch.Tensor
-    k_weight: torch.Tensor
-    k_bias: torch.Tensor
-    v_weight: torch.Tensor
-    v_bias: torch.Tensor
-
-    def __init__(self, mha: nn.MultiheadAttention) -> None:
-        super().__init__()
-        assert mha.batch_first and mha._qkv_same_embed_dim
-        c = mha.embed_dim
-        for i, name in enumerate("qkv"):
-            self.register_buffer(f"{name}_weight", mha.in_proj_weight[i * c : (i + 1) * c].detach().clone())
-            self.register_buffer(f"{name}_bias", mha.in_proj_bias[i * c : (i + 1) * c].detach().clone())
-        self.out_proj = mha.out_proj
-        self.heads = mha.num_heads
-        self.scale = (c // mha.num_heads) ** -0.5
-
-    def project(self, name: str, x: torch.Tensor) -> torch.Tensor:
-        return F.linear(x, getattr(self, f"{name}_weight"), getattr(self, f"{name}_bias"))
-
-    def forward(
-        self, query: torch.Tensor, memory: torch.Tensor, need_weights: bool = False
-    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
-        out = attention(
-            self.project("q", query),
-            self.project("k", memory),
-            self.project("v", memory),
-            self.heads,
-            self.scale,
-            need_weights,
-        )
-        if need_weights:
-            return self.out_proj(out[0]), out[1]
-        return self.out_proj(out)
-
-
 class ChessQueries2D(nn.Module):
     """ChessQueriesModel for batch size 1 with every token tensor kept 2D, (tokens, channels).
 
     The LiteRT WebGPU delegate lays out a linear layer's output on 3D (1, N, C) tensors
     differently from the ops that consume it, and scrambles all but the first token.
-    Numerically identical to the original (checked in build_model). Also:
-    - attention is split into heads on 3D tensors instead of 5D reshapes, except in the
-      first MAX_FUSED_ATTENTION encoder blocks, where it is a fused attention composite
+    Numerically identical to the original (checked in build_model). The decoder's layers
+    already run on 2D tensors (camera_chess.chessqueries.models.decoder), so they are called
+    as they are, except the first. Also:
+    - encoder attention is split into heads on 3D tensors instead of 5D reshapes, except in
+      the first MAX_FUSED_ATTENTION encoder blocks, where it is a fused attention composite
       (see fused_attention);
     - the first decoder layer's self-attention is precomputed: its input is the learned
       square queries, so it is a matmul of two constants, which the delegate rejects;
@@ -240,8 +191,7 @@ class ChessQueries2D(nn.Module):
         # Patch centres in [0, 1] input coordinates, (patches, 2)
         self.register_buffer("grid_xy", grid_xy)
         self.norm, self.head = recognizer.norm, recognizer.head
-        self.decoder_layers = cast(Sequence[nn.TransformerDecoderLayer], recognizer.decoder.layers)
-        assert recognizer.decoder.norm is None and not any(layer.norm_first for layer in self.decoder_layers)
+        self.decoder_layers = cast(Sequence[QueryDecoderLayer], recognizer.decoder.layers)
         for block in self.encoder.blocks:
             attn = block.attn
             assert isinstance(attn.q_norm, nn.Identity) and isinstance(attn.k_norm, nn.Identity)
@@ -253,22 +203,22 @@ class ChessQueries2D(nn.Module):
         # scores of the blocks in score_shrink are computed shrunk (see attention)
         self.residual_scale = 1.0
         self.score_shrink: dict[int, float] = {}
-        self.self_attn = nn.ModuleList(InProjection(layer.self_attn) for layer in self.decoder_layers)
-        self.cross_attn = nn.ModuleList(InProjection(layer.multihead_attn) for layer in self.decoder_layers)
 
-        first, cross = self.decoder_layers[0], cast(InProjection, self.cross_attn[0])
+        first = self.decoder_layers[0]
+        cross = first.multihead_attn
         with torch.no_grad():
             queries = recognizer.queries(1)[0]  # (64, C)
-            x = first.norm1(queries + self.self_attn[0](queries, queries))
+            x = first.norm1(queries + first.self_attn(queries, queries)[0])
             self.register_buffer("first_x", x)
             # Each head's scores K q^T: (memory Wk^T + bk) q^T = memory (q Wk)^T + q bk
-            d = x.shape[-1] // cross.heads
-            q = cross.project("q", x) * cross.scale
+            d = x.shape[-1] // cross.num_heads
+            q = F.linear(x, *cross.projection(0)) * d**-0.5
+            k_weight, k_bias = cross.projection(1)
             weights, biases = [], []
-            for i in range(cross.heads):
+            for i in range(cross.num_heads):
                 s = slice(i * d, (i + 1) * d)
-                weights.append(q[:, s] @ cross.k_weight[s])
-                biases.append(q[:, s] @ cross.k_bias[s])
+                weights.append(q[:, s] @ k_weight[s])
+                biases.append(q[:, s] @ k_bias[s])
             self.register_buffer("first_scores_weight", torch.cat(weights))  # (heads * 64, C)
             self.register_buffer("first_scores_bias", torch.cat(biases))
 
@@ -378,14 +328,15 @@ class ChessQueries2D(nn.Module):
         )
 
     def first_cross_attention(self, memory: torch.Tensor) -> torch.Tensor:
-        cross = cast(InProjection, self.cross_attn[0])
-        v = cross.project("v", memory)
+        cross = self.decoder_layers[0].multihead_attn
+        heads = cross.num_heads
+        v = F.linear(memory, *cross.projection(2))
         scores_t = F.linear(memory, self.first_scores_weight, self.first_scores_bias)  # (M, heads * 64)
         m = memory.shape[0]
-        d = v.shape[-1] // cross.heads
-        n = scores_t.shape[-1] // cross.heads
-        scores = scores_t.reshape(m, cross.heads, n).permute(1, 2, 0)  # (H, 64, M)
-        vh = v.reshape(m, cross.heads, d).transpose(0, 1)  # (H, M, d)
+        d = v.shape[-1] // heads
+        n = scores_t.shape[-1] // heads
+        scores = scores_t.reshape(m, heads, n).permute(1, 2, 0)  # (H, 64, M)
+        vh = v.reshape(m, heads, d).transpose(0, 1)  # (H, M, d)
         out = torch.matmul(torch.softmax(scores, dim=-1), vh).transpose(0, 1).reshape(n, -1)
         return cross.out_proj(out)
 
@@ -393,19 +344,16 @@ class ChessQueries2D(nn.Module):
         memory = self.encode(x)
         last = len(self.decoder_layers) - 1
         assert last > 0
+        weights = None
         for i, layer in enumerate(self.decoder_layers):
             if i == 0:
                 # As one row: the delegate lays out a constant (64, C) operand of an add wrongly
                 attended = self.first_cross_attention(memory)
                 h = layer.norm2((attended.reshape(1, -1) + self.first_x.reshape(1, -1)).reshape(attended.shape))
+                h = layer.norm3(h + layer.ff_block(h))
             else:
-                h = layer.norm1(h + self.self_attn[i](h, h))
-                if i == last:
-                    out, weights = self.cross_attn[i](h, memory, need_weights=True)
-                else:
-                    out = self.cross_attn[i](h, memory)
-                h = layer.norm2(h + out)
-            h = layer.norm3(h + layer.linear2(layer.activation(layer.linear1(h))))
+                h, weights = layer(h, memory, need_weights=i == last)
+        assert weights is not None
         # Prefix (CLS/register) tokens have no position, so they are left out and the rest renormalised
         w = weights[:, self.encoder.num_prefix_tokens :]
         centroids = torch.matmul(w, self.grid_xy) / w.sum(-1, keepdim=True)  # (64, 2)
@@ -442,7 +390,6 @@ def build_model(ckpt: Path) -> tuple[BrowserModel, int]:
     resolution = int(read_safetensors_metadata(ckpt)["resolution"])
     recognizer = load_safetensors_model(ckpt, device="cpu").float()
     grid = bake_pos_embed(recognizer.encoder, resolution)
-    torch.backends.mha.set_fastpath_enabled(False)
     centres = (torch.arange(grid, dtype=torch.float32) + 0.5) / grid
     ys, xs = torch.meshgrid(centres, centres, indexing="ij")
     grid_xy = torch.stack([xs.flatten(), ys.flatten()], dim=-1)  # row-major, as the patch tokens
