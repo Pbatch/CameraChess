@@ -1,0 +1,20 @@
+ChessQueries model weights
+Required Notice: Copyright (c) 2026 Joël Seytre.
+The fine-tuned ChessQueries model weights are distributed under PolyForm Noncommercial 1.0.0.
+
+MobileNetV4 encoder (chessq-chesscam-mnv4m-320-v1-fp16.tflite,
+chessq-chesscam-mnv4m-320-v1-fp32.safetensors):
+The encoder starts from the timm library's
+mobilenetv4_conv_medium.e250_r384_in12k_ft_in1k weights, Apache License 2.0,
+https://huggingface.co/timm/mobilenetv4_conv_medium.e250_r384_in12k_ft_in1k.
+MobileNetV4 architecture: Qin et al., "MobileNetV4: Universal Models for the
+Mobile Ecosystem", Google, 2024. By PBatch23888: the encoder was trained for
+chessboard recognition together with a ChessQueries decoder, using the
+ChessQueries code, and exported to LiteRT with FP16 weights.
+
+Training data used under attribution terms:
+Fenit: "Annotated Image Dataset for Fenit: Automatic Chessboard Digitization and
+FEN Generation", Harjanto, Oei and Susanto, Binus University, CC BY 4.0.
+Samryan: chess-dataset by Sam Ryan and Mukund Vaidya, MIT License,
+https://github.com/samryan18/chess-dataset.
+CVChess labels: released with ChessQueries, CC BY-NC 4.0.
