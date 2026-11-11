@@ -51,7 +51,8 @@ def main() -> None:
 
     resolution = int(read_safetensors_metadata(args.checkpoint)["resolution"])
     recognizer = load_safetensors_model(args.checkpoint, device="cuda").float()
-    bake_pos_embed(recognizer.encoder, resolution)
+    if recognizer.is_vit:
+        bake_pos_embed(recognizer.encoder, resolution)
     model = TensorRTModel(recognizer).cuda().eval()
     dummy = torch.zeros(args.batch, resolution, resolution, 4, dtype=torch.uint8, device="cuda")
     args.output.parent.mkdir(parents=True, exist_ok=True)

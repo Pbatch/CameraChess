@@ -100,6 +100,11 @@ class TrainingConfig:
     workers: int = 8
     # Start from released weights (a .safetensors on the volume) instead of DINOv2 alone
     init_weights: str = ""
+    # Distil from released weights (a .safetensors on the volume, same resolution): the student also
+    # learns the teacher's per-square probabilities on every training image, as it is augmented
+    distill_from: str = ""
+    distill_weight: float = 1.0
+    distill_temperature: float = 2.0
     # Test splits the last weights are scored on after training
     eval_datasets: str = "chesscam,chessred,chesscog,slcc"
     wandb_project: str = "chessqueries"
@@ -127,6 +132,8 @@ class TrainingConfig:
             raise ValueError("The encoder must unfreeze before the last epoch")
         self.sources()
         self.eval_sources()
+        if self.distill_weight < 0 or self.distill_temperature <= 0:
+            raise ValueError("Use a non-negative distillation weight and a positive temperature")
         if self.all_splits and set(self.sources()) & set(self.eval_sources()):
             raise ValueError("With all_splits the test splits are trained on, so evaluate only on other datasets")
 
@@ -236,6 +243,17 @@ class ChessQueriesTrainingJob:
         if schedulers and schedulers[0]["last_epoch"] != state["global_step"]:
             raise ValueError(f"{checkpoint} has a per-epoch LR schedule, so it can't be resumed per batch")
 
+    def teacher(self) -> ChessQueriesModel | None:
+        if not self.config.distill_from:
+            return None
+        path = self.root / self.config.distill_from.lstrip("/")
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        resolution = int(read_safetensors_metadata(path)["resolution"])
+        if resolution != self.config.resolution:
+            raise ValueError(f"The teacher takes {resolution}px images, the run {self.config.resolution}px")
+        return load_safetensors_model(path).float()
+
     def init_weights_path(self) -> Path | None:
         if not self.config.init_weights:
             return None
@@ -271,6 +289,7 @@ class ChessQueriesTrainingJob:
             self.check_resume(checkpoint, output)
         # A resumed run takes its weights from the checkpoint instead
         weights = self.init_weights_path() if checkpoint is None else None
+        teacher = self.teacher()
         output.mkdir(parents=True, exist_ok=checkpoint is not None)
         (output / "config.json").write_text(json.dumps(asdict(config), indent=2) + "\n")
         pl.seed_everything(config.seed, workers=True)
@@ -299,6 +318,9 @@ class ChessQueriesTrainingJob:
                 unfreeze_epoch=config.unfreeze_epoch,
                 lr_floor=config.lr_floor,
                 head_type=config.head_type,
+                teacher=teacher,
+                distill_weight=config.distill_weight,
+                distill_temperature=config.distill_temperature,
             )
             if weights is not None:
                 model.model.load_state_dict(load_safetensors_model(weights).float().state_dict())

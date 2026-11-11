@@ -120,6 +120,10 @@ def main(
     gpu_augment: bool | None = None,
     # Train on every split (no validation or test on the trained datasets)
     all_splits: bool | None = None,
+    # Distil from these weights on the volume, e.g. /runs/dinov3-s-448-yunker-ft-all-v10/last.safetensors
+    distill_from: str | None = None,
+    distill_weight: float | None = None,
+    distill_temperature: float | None = None,
     wandb_project: str | None = None,
     wandb_entity: str | None = None,
     evaluate_only: bool = False,
@@ -144,6 +148,9 @@ def main(
         "eval_datasets": eval_datasets,
         "gpu_augment": gpu_augment,
         "all_splits": all_splits,
+        "distill_from": distill_from,
+        "distill_weight": distill_weight,
+        "distill_temperature": distill_temperature,
         "wandb_project": wandb_project,
         "wandb_entity": wandb_entity,
     }
