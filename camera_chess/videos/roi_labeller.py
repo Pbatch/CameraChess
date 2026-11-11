@@ -1,7 +1,7 @@
 """Serves a page for drawing each video's board boxes, and saves them to video_config.yaml.
 
-`roi` is the 3D board and `overlay_roi` is the 2D board drawn over the video, both [x, y, width, height]
-in video pixels. A video can instead be marked `unusable: true`, e.g. when the board can't be seen.
+`roi` is the 3D board as [x, y, width, height] in video pixels. The 2D board (`overlay_roi`) is found by a
+script, so this tool only shows it and never saves it. A video can instead be marked `unusable: true`, e.g. when the board can't be seen.
 
 Usage: python -m camera_chess.videos.roi_labeller [--port 8000], then open http://localhost:8000
 """
@@ -17,7 +17,7 @@ from camera_chess.local_server import LocalHandler, serve
 from camera_chess.videos.config import config_path, load_all, save_all
 
 PAGE_PATH = Path(__file__).with_name("roi_labeller.html")
-ROI_KEYS = ("roi", "overlay_roi")
+ROI_KEYS = ("roi",)
 
 
 def find_videos():
@@ -40,7 +40,7 @@ def find_videos():
                 "title": title,
                 "path": path,
                 "unusable": bool(d.get("unusable")),
-                **{k: d.get(k) for k in ROI_KEYS},
+                **{k: d.get(k) for k in (*ROI_KEYS, "overlay_roi")},
             }
         )
     return videos

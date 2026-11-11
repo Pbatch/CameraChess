@@ -49,8 +49,6 @@ SAME_GAME_SQUARES = 4
 SPLIT_SHARES = {Split.TRAIN: 0.7, Split.VAL: 0.15, Split.TEST: 0.15}
 # Games with more photos than this are all for training, so no one game makes up most of val or test
 MAX_HELD_OUT_GAME = 10
-# Share of the corners' bounding box added on every side of a crop, as in camera_chess/videos/make_training_data.py
-MARGIN = 0.15
 # The photos are 3000x4000 to 4284x5712; crops are shrunk to this shorter side (pack_datasets shrinks further)
 MAX_SIDE = 1024
 JPEG_QUALITY = 95
@@ -85,14 +83,13 @@ def board_corners(label: str) -> list[tuple[float, float]] | None:
 
 
 def crop_box(corners: list[tuple[float, float]], width: int, height: int) -> tuple[int, int, int, int]:
-    """(x0, y0, x1, y1) in pixels: the corners' bounding box, grown by ``MARGIN`` of its size and kept within the photo"""
+    """(x0, y0, x1, y1) in pixels: the corners' bounding box, kept within the photo"""
     xs, ys = [x * width for x, _ in corners], [y * height for _, y in corners]
-    dx, dy = MARGIN * (max(xs) - min(xs)), MARGIN * (max(ys) - min(ys))
     return (
-        max(0, round(min(xs) - dx)),
-        max(0, round(min(ys) - dy)),
-        min(width, round(max(xs) + dx)),
-        min(height, round(max(ys) + dy)),
+        max(0, round(min(xs))),
+        max(0, round(min(ys))),
+        min(width, round(max(xs))),
+        min(height, round(max(ys))),
     )
 
 

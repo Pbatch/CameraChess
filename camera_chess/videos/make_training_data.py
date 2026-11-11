@@ -4,7 +4,8 @@ with the position the overlay shows at that moment.
 Each dataset needs, from the usual steps:
   `roi` and `overlay_roi` in video_config.yaml (camera_chess.videos.roi_labeller)
   overlay_moves.json, the true moves and their times (camera_chess.videos.overlay_moves)
-  chesscam_probs.f32.gz and .json, the app's model on every frame (camera_chess.videos.chesscam_model), to catch bad labels
+  chesscam_probs_<MODEL>.f32.gz and .json, MODEL on every frame (camera_chess.videos.chesscam_model --model MODEL), to
+  catch bad labels
 
 Frames are taken between moves, never from just before a move to just after it, when a piece is in the air or in a
 hand and the board is neither position. Hands over the board are kept: what they hide is still on the board. Each
@@ -16,19 +17,20 @@ takeback, a camera cut or a board being reset rather than a hard frame, and a vi
 its frames is left out for a look. Frames the model merely gets a few squares wrong are kept, as those are what the
 data is for.
 
-Each crop is the 3D board region plus MARGIN on every side, as the region someone draws in the app, so training can
-crop it again with random margins. The 2D overlay shows the answer, so the top margin stops short of it, and any part
-of it still inside a crop (where it overlaps the board region itself) is blacked out.
+Each crop is exactly the 3D board region, as the app crops the region someone draws. The 2D overlay shows the answer,
+so any part of it inside a crop (where it overlaps the board region) is blacked out.
 
 A promotion marked `[%pawn_left]` in gt.pgn (see camera_chess.videos.overlay_moves) is labelled as the pawn left on
 its square, until the pawn was swapped for the new piece, or until the square next changes.
 
 The games scored by the tracker replay in CameraChessWeb (data/yunker/benchmark.txt) are never used.
 
-Usage: python -m camera_chess.videos.make_training_data -d yunker/D81hFXZ0Cp4 [-d ...] [--out data/yunker_crops]
+Usage: python -m camera_chess.videos.make_training_data -d yunker/D81hFXZ0Cp4 [-d ...] [-u ...] [--out data/yunker_crops]
+-u uses a dataset's labels without MODEL's check, e.g. one an earlier build checked with another model.
        python -m camera_chess.videos.make_training_data --measure-offset -d yunker/LEYxdEWJXCg [-d ...]
 Writes the crops to <out>/images/train/ and annotations.json (image, fen, split, group, box, time,
-model_agreement), laid out as ChessQueries' ChessCam dataset. The output folder is rebuilt from scratch on each run.
+model_agreement), laid out as ChessQueries' ChessCam dataset. The output folder is rebuilt from scratch on each run,
+unless --add, which keeps the other datasets there and redoes only these.
 """
 
 import argparse
@@ -44,7 +46,7 @@ from loguru import logger
 from PIL import Image
 
 from camera_chess.config import get_config
-from camera_chess.videos.config import load_config, video_path
+from camera_chess.videos.config import load_config, usable, video_path
 from camera_chess.videos.overlay_moves import read_pawns_left
 
 # The app model's classes, in the order chesscam_probs holds them
@@ -70,16 +72,17 @@ MAX_DISAGREEMENTS = 16
 # arrow or highlight can hide one (four benchmark games end one square off and replay fine)
 END_MISMATCHES = 1
 MAX_DROPPED = 0.2
-# Share of the board region's width and height added on every side of a crop
-MARGIN = 0.15
 JPEG_QUALITY = 95
+# The model whose readings catch bad labels: the 320 fine-tune of v10, about 2.35x faster to run than the app's 448
+MODEL = "chessq-ft-v10-dinov3-320"
 
 
 def load_probs(dataset):
-    """(frames, 64, 13) probabilities in FEN order, and what they are (frame rate, region)"""
+    """(frames, 64, 13) probabilities in FEN order from MODEL, and what they are (frame rate, region)"""
     d = get_config().DATA_ROOT / dataset
-    meta = json.loads((d / "chesscam_probs.json").read_text())
-    with gzip.open(d / "chesscam_probs.f32.gz", "rb") as f:
+    name = f"chesscam_probs_{MODEL}"
+    meta = json.loads((d / f"{name}.json").read_text())
+    with gzip.open(d / f"{name}.f32.gz", "rb") as f:
         probs = np.frombuffer(f.read(), "<f4").reshape(-1, 64, len(CLASSES))
     return probs, meta
 
@@ -152,21 +155,10 @@ def frame_times(game):
     return chosen
 
 
-def crop_box(roi, overlay, width, height):
-    """The crop around the board region, (x0, y0, x1, y1) within the frame. The overlay sits above the board, so the
-    top margin stops at its bottom edge where it would reach into it."""
+def crop_box(roi, width, height):
+    """The board region as (x0, y0, x1, y1), kept within the frame"""
     x, y, w, h = roi
-    dx, dy = MARGIN * w, MARGIN * h
-    x0, y0, x1, y1 = (
-        max(0, round(x - dx)),
-        max(0, round(y - dy)),
-        min(width, round(x + w + dx)),
-        min(height, round(y + h + dy)),
-    )
-    ox, oy, ow, oh = overlay
-    if ox < x1 and ox + ow > x0 and y0 < oy + oh <= y:
-        y0 = oy + oh
-    return x0, y0, x1, y1
+    return max(0, x), max(0, y), min(width, x + w), min(height, y + h)
 
 
 def crop(frame, box, overlay):
@@ -180,21 +172,28 @@ def crop(frame, box, overlay):
     return out
 
 
-def make(dataset, out_dir):
-    """The dataset's annotations, with its crops written to out_dir, or [] if its labels look wrong"""
+def make(dataset, out_dir, checked=True):
+    """The dataset's annotations, with its crops written to out_dir, or [] if its labels look wrong. Unless `checked`
+    is False, when its labels are used without MODEL's readings (model_agreement is then null)."""
     config = load_config(dataset)
     game = load_game(dataset)
-    probs, meta = load_probs(dataset)
-    probs_fps = meta["fps"]
-    if config["roi"] != meta["roi"]:
-        raise ValueError(f"{dataset}'s chesscam_probs are for another region; rerun camera_chess.videos.chesscam_model")
+    if checked:
+        probs, meta = load_probs(dataset)
+        if config["roi"] != meta["roi"]:
+            raise ValueError(
+                f"{dataset}'s chesscam_probs are for another region; rerun camera_chess.videos.chesscam_model "
+                f"--model {MODEL}"
+            )
     if game.get("end_mismatches", 0) > END_MISMATCHES:
         logger.warning(f"{dataset}: the overlay's last position disagrees with the moves read; skipped")
         return []
 
     kept, dropped = [], 0
     for board, t in frame_times(game):
-        index = min(len(probs) - 1, round(t * probs_fps))
+        if not checked:
+            kept.append((board, t, None))
+            continue
+        index = min(len(probs) - 1, round(t * meta["fps"]))
         agreement = int((probs[index].argmax(-1) == labels(board)).sum())
         if 64 - agreement > MAX_DISAGREEMENTS:
             dropped += 1
@@ -209,7 +208,7 @@ def make(dataset, out_dir):
     fps = reader.get_avg_fps()
     frames = reader.get_batch([min(len(reader) - 1, round(t * fps)) for _, t, _ in kept]).asnumpy()
     height, width = frames.shape[1:3]
-    box = crop_box(config["roi"], config["overlay_roi"], width, height)
+    box = crop_box(config["roi"], width, height)
     x, y, w, h = config["roi"]
     name = dataset.replace("/", "_")
     annotations = []
@@ -228,7 +227,8 @@ def make(dataset, out_dir):
                 "model_agreement": agreement,
             }
         )
-    logger.info(f"{dataset}: {len(annotations)} frames from {len(game['moves'])} moves ({dropped} dropped)")
+    note = f"{dropped} dropped" if checked else "labels not checked"
+    logger.info(f"{dataset}: {len(annotations)} frames from {len(game['moves'])} moves ({note})")
     return annotations
 
 
@@ -265,27 +265,43 @@ def benchmark_path():
     return get_config().DATA_ROOT / "yunker" / "benchmark.txt"
 
 
-def main(datasets, out_dir):
+def main(datasets, out_dir, unchecked=(), add=False):
+    datasets, unchecked = usable(datasets), usable(unchecked)
     benchmark = {f"yunker/{line.strip()}" for line in benchmark_path().read_text().splitlines() if line.strip()}
-    if used := [d for d in datasets if d in benchmark or d.split("_game_")[0] in benchmark]:
+    if used := [d for d in [*datasets, *unchecked] if d in benchmark or d.split("_game_")[0] in benchmark]:
         raise ValueError(f"{used} are scored by the tracker replay, so must not be trained on")
-    if out_dir.exists():
+    kept = []
+    if add and (out_dir / "annotations.json").is_file():
+        # The other datasets' crops stay; these datasets' old ones go, so a rerun leaves no stale frames behind
+        redo = {*datasets, *unchecked}
+        for a in json.loads((out_dir / "annotations.json").read_text()):
+            if a["group"] in redo:
+                (out_dir / a["image"]).unlink(missing_ok=True)
+            else:
+                kept.append(a)
+    elif out_dir.exists():
         shutil.rmtree(out_dir)
-    (out_dir / "images" / "train").mkdir(parents=True)
+    (out_dir / "images" / "train").mkdir(parents=True, exist_ok=True)
     annotations = [a for dataset in datasets for a in make(dataset, out_dir)]
-    (out_dir / "annotations.json").write_text(json.dumps(annotations, indent=1))
+    annotations += [a for dataset in unchecked for a in make(dataset, out_dir, checked=False)]
     used = len({a["group"] for a in annotations})
-    logger.info(f"Wrote {len(annotations)} frames from {used} of {len(datasets)} videos to {out_dir}")
+    logger.info(f"Wrote {len(annotations)} frames from {used} of {len(datasets) + len(unchecked)} videos to {out_dir}")
+    if kept:
+        logger.info(f"Kept {len(kept)} frames from {len({a['group'] for a in kept})} other videos already there")
+    (out_dir / "annotations.json").write_text(json.dumps(kept + annotations, indent=1))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", "-d", action="append", required=True)
-    # Not data/yunker, which holds the source videos: the output folder is deleted and rebuilt on each run
+    parser.add_argument("--dataset", "-d", action="append", default=[])
+    # e.g. the datasets of an earlier build, already checked by another model, that have no readings from MODEL
+    parser.add_argument("--unchecked", "-u", action="append", default=[], help="a dataset to use without MODEL's check")
+    # Not data/yunker, which holds the source videos: the output folder is deleted and rebuilt on each run (but --add)
     parser.add_argument("--out", type=Path, default=get_config().DATA_ROOT / "yunker_crops")
     parser.add_argument("--measure-offset", action="store_true")
+    parser.add_argument("--add", action="store_true", help="keep the other datasets already in --out")
     args = parser.parse_args()
     if args.measure_offset:
         measure_offset(args.dataset)
     else:
-        main(args.dataset, args.out)
+        main(args.dataset, args.out, args.unchecked, args.add)

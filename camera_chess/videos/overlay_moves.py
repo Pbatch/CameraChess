@@ -22,9 +22,12 @@ Rerunning this keeps such comments on moves that are read the same again.
 
 import argparse
 import copy
+import itertools
 import json
+import queue
 import re
 import subprocess
+import threading
 
 import chess
 import chess.pgn
@@ -33,7 +36,7 @@ from loguru import logger
 
 from camera_chess.config import get_config
 from camera_chess.videos import ffmpeg
-from camera_chess.videos.chessvision_3lc import SQUARE, SYMBOLS, UNKNOWN, SquareClassifier
+from camera_chess.videos.chessvision_3lc import BATCH, SQUARE, SYMBOLS, UNKNOWN, SquareClassifier
 from camera_chess.videos.config import load_all, load_config, save_all, video_path
 
 SIZE = 8 * SQUARE
@@ -54,9 +57,38 @@ START_MISMATCHES = 2
 LEAD_IN = 3.0
 
 
+# Frames decoded ahead of the classifier
+READ_AHEAD = 32
+
+
 def read_frames(path, roi):
-    """Yields (time, SIZE x SIZE x 3 crop of the overlay) at FPS"""
-    return ffmpeg.read_frames(path, roi, SIZE, FPS)
+    """Yields (time, SIZE x SIZE x 3 crop of the overlay) at FPS, read on a thread, so ffmpeg keeps decoding while the
+    classifier runs instead of waiting on a full pipe (a frame is far bigger than the pipe's buffer)"""
+    frames = queue.Queue(maxsize=READ_AHEAD)
+    errors = []
+
+    def read():
+        try:
+            for item in ffmpeg.read_frames(path, roi, SIZE, FPS):
+                frames.put(item)
+        except Exception as error:  # noqa: BLE001 - re-raised below, on the caller's thread
+            errors.append(error)
+        finally:
+            frames.put(None)
+
+    threading.Thread(target=read, daemon=True).start()
+    while (item := frames.get()) is not None:
+        yield item
+    if errors:
+        raise errors[0]
+
+
+def classified(path, roi, classifier):
+    """Yields (time, each square's label, log-probabilities) for each frame, classified BATCH frames at a time"""
+    for batch in itertools.batched(read_frames(path, roi), BATCH):
+        times, frames = zip(*batch)
+        labels, log_probs = classifier.classify_batch(np.stack(frames))
+        yield from zip(times, labels, log_probs)
 
 
 # Frames with fewer readable squares than this are skipped, as a frame of unreadable squares matches any position
@@ -113,8 +145,7 @@ def track(path, roi, classifier):
         if games:
             games[-1]["end_mismatches"] = int(mismatches(last, placement(board)))
 
-    for t, frame in read_frames(path, roi):
-        observed, log_probs = classifier.classify(frame)
+    for t, observed, log_probs in classified(path, roi, classifier):
         if (observed != UNKNOWN).sum() < MIN_KNOWN:
             continue
         if mismatches(observed, start) <= START_MISMATCHES and (board is None or len(board.move_stack) > 1):
@@ -156,12 +187,33 @@ def track(path, roi, classifier):
     return [game for game in games if len(game["moves"]) > 1]
 
 
-def cut_video(path, out_path, start, end):
-    """Re-encodes [start, end) seconds of the video, as copying the stream could only cut at keyframes. end None is
-    the end of the video."""
-    duration = [] if end is None else ["-t", str(end - start)]
-    cmd = ["ffmpeg", "-v", "error", "-y", "-ss", str(start), "-i", path, *duration, "-an", "-c:v", "libx264"]
+def keyframes(path):
+    """The video's keyframe timestamps in seconds, which read_frames' times and ffmpeg's -ss both count in (the first
+    frame's isn't always 0)"""
+    cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-of", "json", "-show_entries", "packet=pts_time,flags"]
+    packets = json.loads(subprocess.run([*cmd, path], check=True, capture_output=True, text=True).stdout)["packets"]
+    return sorted(float(p["pts_time"]) for p in packets if "K" in p.get("flags", ""))
+
+
+def cut_video(path, out_path, start, end, earliest=0.0, latest=None):
+    """Copies the video from a keyframe up to `end` seconds (None: the end of the video) and returns the second it
+    starts at, as copying the stream can only start at a keyframe: the last at or before `start` that is no earlier than
+    `earliest`, else the first after `start` and no later than `latest`. With neither (keyframes are 5s apart in the
+    Yunker videos) it re-encodes from `start`, which takes about a minute for ten minutes of 720p."""
+    times = keyframes(path)
+    before = [k for k in times if earliest <= k <= start]
+    after = [k for k in times if start < k and (latest is None or k <= latest)]
+    duration = lambda s: [] if end is None else ["-t", f"{end - s:.3f}"]
+    if before or after:
+        s = before[-1] if before else after[0]
+        # Input seeking with a copied stream starts at the last keyframe at or before -ss; the margin keeps rounding
+        # from landing on the one before
+        cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{s + 0.01:.3f}", "-i", path, *duration(s), "-an"]
+        subprocess.run([*cmd, "-c:v", "copy", "-avoid_negative_ts", "make_zero", out_path], check=True)
+        return s
+    cmd = ["ffmpeg", "-v", "error", "-y", "-ss", str(start), "-i", path, *duration(start), "-an", "-c:v", "libx264"]
     subprocess.run([*cmd, "-crf", "18", "-preset", "fast", out_path], check=True)
+    return start
 
 
 PAWN_LEFT = re.compile(r"\[%pawn_left(?:\s+([\d.]+))?\]")
@@ -218,29 +270,34 @@ def write_game(dataset, game):
 
 def write(dataset, games):
     """Writes gt.pgn and overlay_moves.json to the dataset. A video of several games is instead cut into a dataset per
-    game, `<dataset>_game_N`, from LEAD_IN before its start position is first seen (but after the last game's last
-    move) to where the next part starts, with its times from the cut and its own entry in video_config.yaml, so each
+    game, `<dataset>_game_N`, from about LEAD_IN before its start position is first seen (the keyframe nearest it, but
+    after the last game's last move; see cut_video) to where the next part starts, with its times from the cut and its own entry in video_config.yaml, so each
     dataset is one game from its video's start."""
     if len(games) == 1:
         write_game(dataset, games[0])
         return
-    config = load_all()
+    config = load_config(dataset)
+    parts = {}
     cuts = [
         max(game["start"] - LEAD_IN, prev["moves"][-1][0] if prev else 0) for prev, game in zip([None, *games], games)
     ]
-    for n, game in enumerate(games, 1):
+    for n, (prev, game) in enumerate(zip([None, *games], games), 1):
         part = f"{dataset}_game_{n}"
-        start = round(cuts[n - 1], 1)
         end = round(cuts[n], 1) if n < len(games) else None
         part_dir = get_config().DATA_ROOT / part
         part_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Cutting {start}s to {end if end is not None else 'the end'}s of {dataset} into {part}")
-        cut_video(video_path(dataset), part_dir / "video.mp4", start, end)
+        # From a keyframe after the last game's last move, and at least a second before this game's first
+        earliest = prev["moves"][-1][0] if prev else 0.0
+        start = cut_video(
+            video_path(dataset), part_dir / "video.mp4", cuts[n - 1], end, earliest, game["moves"][0][0] - 1
+        )
+        logger.info(f"Cut {start:.2f}s to {end if end is not None else 'the end'}s of {dataset} into {part}")
         moves = [(round(t - start, 1), uci) for t, uci in game["moves"]]
         write_game(part, {**game, "moves": moves})
         # A deep copy, as safe_dump writes lists shared between entries as aliases
-        config[part] = copy.deepcopy(config[dataset])
-    save_all(config)
+        parts[part] = copy.deepcopy(config)
+    # Read again, as video_config.yaml may have changed while the video was cut (e.g. boxes saved by roi_labeller)
+    save_all(load_all() | parts)
 
 
 def main(datasets):

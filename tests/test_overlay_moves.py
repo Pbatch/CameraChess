@@ -38,12 +38,13 @@ def overlay_of(*ucis):
 class FakeClassifier:
     """Reads a frame that is already a placement, sure of every square except those marked UNKNOWN"""
 
-    def classify(self, observed):
-        log_probs = np.full((64, len(SYMBOLS)), np.log(1e-4))
-        known = observed != UNKNOWN
-        log_probs[np.flatnonzero(known), observed[known]] = np.log(0.99)
-        log_probs[~known] = np.log(1 / len(SYMBOLS))
-        return observed, log_probs
+    def classify_batch(self, boards):
+        log_probs = np.full((*boards.shape, len(SYMBOLS)), np.log(1e-4))
+        for observed, out in zip(boards, log_probs):
+            known = observed != UNKNOWN
+            out[np.flatnonzero(known), observed[known]] = np.log(0.99)
+            out[~known] = np.log(1 / len(SYMBOLS))
+        return boards, log_probs
 
 
 def run(monkeypatch, frames):
@@ -124,3 +125,30 @@ def test_hand_made_pawn_left_comments_are_read_and_kept_when_rewritten(monkeypat
     game["moves"][8] = (8.0, "h7g8r")
     overlay_moves.write_game("game", game)
     assert overlay_moves.read_pawns_left("game") == {}
+
+
+def cut_with_keyframes(monkeypatch, keyframes, *args):
+    """cut_video's start, and the ffmpeg command it ran, with the video's keyframes at `keyframes`"""
+    from camera_chess.videos import overlay_moves
+
+    commands = []
+    monkeypatch.setattr(overlay_moves, "keyframes", lambda path: keyframes)
+    monkeypatch.setattr(overlay_moves.subprocess, "run", lambda cmd, check: commands.append(cmd))
+    start = overlay_moves.cut_video("in.mp4", "out.mp4", *args)
+    return start, commands[0]
+
+
+def test_a_cut_copies_from_the_last_keyframe_before_it(monkeypatch):
+    start, cmd = cut_with_keyframes(monkeypatch, [0.04, 5.04, 10.04], 8.6, 20.0)
+    assert start == 5.04
+    assert cmd[cmd.index("-ss") + 1] == "5.050" and "copy" in cmd and cmd[cmd.index("-t") + 1] == "14.960"
+
+
+def test_a_cut_skips_a_keyframe_before_the_last_games_last_move(monkeypatch):
+    start, _ = cut_with_keyframes(monkeypatch, [0.04, 5.04, 10.04], 8.6, None, 6.0, 12.0)
+    assert start == 10.04
+
+
+def test_a_cut_with_no_keyframe_in_reach_is_re_encoded(monkeypatch):
+    start, cmd = cut_with_keyframes(monkeypatch, [0.04, 5.04, 10.04], 8.6, None, 6.0, 9.5)
+    assert start == 8.6 and "libx264" in cmd

@@ -26,8 +26,6 @@
   .toolbar button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
                     color: var(--text); cursor: pointer; font: inherit; }
   .toolbar button.selected { border-color: currentColor; }
-  .toolbar button[data-key="overlay_roi"] { color: var(--overlay); }
-  .toolbar button[data-key="roi"] { color: var(--board); }
   .toolbar #unusable.selected { color: var(--unusable); }
   .toolbar .status { color: var(--muted); margin-left: auto; }
   .stage { position: relative; align-self: flex-start; max-width: 100%; max-height: calc(100vh - 140px); }
@@ -43,11 +41,9 @@
 <aside id="list"></aside>
 <main>
   <div class="toolbar">
-    <button data-key="overlay_roi">2D board <kbd>1</kbd></button>
-    <button data-key="roi">3D board <kbd>2</kbd></button>
     <button id="play">Play <kbd>space</kbd></button>
     <button id="unusable">Unusable <kbd>u</kbd></button>
-    <button id="next">Next video <kbd>n</kbd></button>
+    <button id="next">Next video <kbd>e</kbd></button>
     <span class="status" id="status"></span>
   </div>
   <div class="stage">
@@ -59,13 +55,11 @@
     <span id="time">0:00</span>
   </div>
   <div class="help">
-    Drag on the video to draw the selected box. It saves at once, then switches to the other box.
+    Drag on the video to draw the 3D board box (orange). It saves at once. The 2D box (blue) is the script's, shown read-only.
     <kbd>←</kbd>/<kbd>→</kbd> seek 5 s, <kbd>p</kbd> previous video, <kbd>u</kbd> marks or unmarks the video as unusable.
   </div>
 </main>
 <script>
-const KEYS = ["overlay_roi", "roi"];
-const COLORS = { overlay_roi: "--overlay", roi: "--board" };
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -73,11 +67,10 @@ const seek = document.getElementById("seek");
 const status = document.getElementById("status");
 let videos = [];
 let index = 0;
-let selected = "overlay_roi";
 // The box being dragged, in video pixels
 let drag = null;
 
-const color = (key) => getComputedStyle(document.documentElement).getPropertyValue(COLORS[key]).trim();
+const color = (name = "--board") => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const formatTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 const renderList = () => {
@@ -88,10 +81,10 @@ const renderList = () => {
     button.classList.toggle("unusable", v.unusable);
     const dots = document.createElement("span");
     dots.className = "dots";
-    for (const key of KEYS) {
+    for (const [key, name] of [["roi", "--board"], ["overlay_roi", "--overlay"]]) {
       const dot = document.createElement("span");
       dot.className = "dot";
-      if (v[key]) dot.style.background = color(key);
+      if (v[key]) dot.style.background = color(name);
       dots.append(dot);
     }
     const text = document.createElement("span");
@@ -104,25 +97,20 @@ const renderList = () => {
   }));
 }
 
-const select = (key) => {
-  selected = key;
-  document.querySelectorAll(".toolbar [data-key]").forEach((b) => b.classList.toggle("selected", b.dataset.key === key));
-}
-
 const draw = () => {
   canvas.width = video.videoWidth || 1280;
   canvas.height = video.videoHeight || 720;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const v = videos[index];
-  const boxes = KEYS.map((key) => [key, (drag && key === selected) ? drag : v?.[key]]);
-  for (const [key, box] of boxes) {
+  // The 2D box comes from a script and is shown read-only, so you can check it
+  const boxes = [[v?.overlay_roi, "--overlay", "2D"], [drag ?? v?.roi, "--board", "3D"]];
+  for (const [box, name, label] of boxes) {
     if (!box) continue;
-    ctx.strokeStyle = color(key);
+    ctx.strokeStyle = ctx.fillStyle = color(name);
     ctx.lineWidth = 3;
     ctx.strokeRect(...box);
-    ctx.fillStyle = color(key);
     ctx.font = "bold 18px system-ui";
-    ctx.fillText(key === "roi" ? "3D" : "2D", box[0] + 6, box[1] + 22);
+    ctx.fillText(label, box[0] + 6, box[1] + 22);
   }
 }
 
@@ -130,7 +118,6 @@ const open = (i) => {
   index = (i + videos.length) % videos.length;
   const v = videos[index];
   video.src = `/video/${encodeURIComponent(v.dataset)}`;
-  select(v.overlay_roi ? "roi" : "overlay_roi");
   document.getElementById("unusable").classList.toggle("selected", v.unusable);
   renderList();
   status.textContent = "";
@@ -179,12 +166,11 @@ canvas.addEventListener("pointerup", async () => {
     return;
   }
   const v = videos[index];
-  v[selected] = box;
+  v.roi = box;
   draw();
   renderList();
-  const response = await save({ dataset: v.dataset, [selected]: box });
-  status.textContent = response.ok ? `Saved ${selected === "roi" ? "3D" : "2D"} box` : "Save failed";
-  select(selected === "roi" ? "overlay_roi" : "roi");
+  const response = await save({ dataset: v.dataset, roi: box });
+  status.textContent = response.ok ? "Saved 3D box" : "Save failed";
 });
 
 video.addEventListener("loadedmetadata", () => {
@@ -205,27 +191,24 @@ const togglePlay = () => video.paused ? video.play() : video.pause();
 document.getElementById("play").onclick = togglePlay;
 document.getElementById("unusable").onclick = toggleUnusable;
 document.getElementById("next").onclick = () => open(index + 1);
-document.querySelectorAll(".toolbar [data-key]").forEach((b) => b.onclick = () => select(b.dataset.key));
 document.addEventListener("keydown", (event) => {
   if (event.target === seek && event.key.startsWith("Arrow")) event.preventDefault();
-  if (event.key === "1") select("overlay_roi");
-  else if (event.key === "2") select("roi");
-  else if (event.key === " ") { event.preventDefault(); togglePlay(); }
+  if (event.key === " ") { event.preventDefault(); togglePlay(); }
   else if (event.key === "ArrowRight") video.currentTime += 5;
   else if (event.key === "ArrowLeft") video.currentTime -= 5;
   else if (event.key === "u") toggleUnusable();
-  else if (event.key === "n") open(index + 1);
+  else if (event.key === "e") open(index + 1);
   else if (event.key === "p") open(index - 1);
 });
 
-// Fewest boxes first, so what still needs drawing is at the top, and unusable videos last. Sorted on load only, so the list doesn't jump while
+// Unlabelled first, so what still needs drawing is at the top, and unusable videos last. Sorted on load only, so the list doesn't jump while
 // drawing; reloading sorts it again.
-const boxes = (v) => v.unusable ? KEYS.length + 1 : KEYS.filter((key) => v[key]).length;
+const boxes = (v) => v.unusable ? 2 : v.roi ? 1 : 0;
 
 fetch("/api/videos").then((r) => r.json()).then((list) => {
   // A stable sort keeps the server's order within each count
   videos = list.sort((a, b) => boxes(a) - boxes(b));
-  const first = videos.findIndex((v) => !v.unusable && (!v.roi || !v.overlay_roi));
+  const first = videos.findIndex((v) => !v.unusable && !v.roi);
   open(first === -1 ? 0 : first);
 });
 </script>

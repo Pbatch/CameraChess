@@ -1,3 +1,5 @@
+import json
+
 import chess
 import numpy as np
 import pytest
@@ -63,18 +65,10 @@ def test_frame_times_are_capped_per_video(monkeypatch):
     assert chosen[0][0].ply() == 1 and chosen[-1][0].ply() == 10
 
 
-def test_crop_box_adds_margins_within_the_frame():
-    # Board region 100x100 at (50, 120); overlay far away
-    box = crop_box((50, 120, 100, 100), (400, 0, 50, 50), width=500, height=230)
-    assert box == (35, 105, 165, 230)
-    assert crop_box((5, 5, 100, 100), (400, 0, 50, 50), width=500, height=500)[:2] == (0, 0)
-
-
-def test_crop_box_stops_short_of_an_overlay_above():
-    # The overlay's bottom edge, at y=110, is inside the top margin
-    assert crop_box((50, 120, 100, 100), (40, 20, 80, 90), width=500, height=500)[1] == 110
-    # Beside the board instead, it is left to crop
-    assert crop_box((50, 120, 100, 100), (300, 20, 80, 90), width=500, height=500)[1] == 105
+def test_crop_box_is_the_board_region_within_the_frame():
+    # Board region 100x100 at (50, 120)
+    assert crop_box((50, 120, 100, 100), width=500, height=500) == (50, 120, 150, 220)
+    assert crop_box((50, 150, 100, 100), width=120, height=230) == (50, 150, 120, 230)
 
 
 def test_crop_blacks_out_the_overlay():
@@ -158,3 +152,30 @@ def test_a_pawn_swapped_later_splits_its_position_at_the_swap():
     chosen = [(piece_on(board, "g8"), t) for board, t in frame_times({**PROMOTION, "pawns_left": {8: 30.0}})]
     assert all(t < 30.0 - BEFORE for symbol, t in chosen if symbol == "P")
     assert all(30.0 + AFTER < t < 40 + OFFSET - BEFORE for symbol, t in chosen if symbol == "Q")
+
+
+def test_add_keeps_the_other_datasets_and_redoes_these(tmp_path, monkeypatch):
+    benchmark = tmp_path / "benchmark.txt"
+    benchmark.write_text("")
+    monkeypatch.setattr(make_training_data, "benchmark_path", lambda: benchmark)
+    out = tmp_path / "out"
+    (out / "images" / "train").mkdir(parents=True)
+    old = [{"image": f"images/train/{g}.jpg", "group": f"yunker/{g}"} for g in ("kept", "redone")]
+    for a in old:
+        (out / a["image"]).write_bytes(b"")
+    (out / "annotations.json").write_text(json.dumps(old))
+
+    def make(dataset, out_dir, checked=True):
+        image = f"images/train/{dataset.split('/')[1]}_new.jpg"
+        (out_dir / image).write_bytes(b"")
+        return [{"image": image, "group": dataset}]
+
+    monkeypatch.setattr(make_training_data, "make", make)
+    make_training_data.main(["yunker/redone", "yunker/added"], out, add=True)
+    images = [a["image"] for a in json.loads((out / "annotations.json").read_text())]
+    assert images == ["images/train/kept.jpg", "images/train/redone_new.jpg", "images/train/added_new.jpg"]
+    assert sorted(p.name for p in (out / "images" / "train").iterdir()) == [
+        "added_new.jpg",
+        "kept.jpg",
+        "redone_new.jpg",
+    ]
