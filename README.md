@@ -1,4 +1,4 @@
-# Camera Chess
+# ChessCam Research
 
 ## Setup
 
