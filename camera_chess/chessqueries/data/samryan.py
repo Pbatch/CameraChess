@@ -46,8 +46,6 @@ MATCH_SIDE = 1500
 MIN_INLIERS = 20
 # A board's opposite sides, as found, may differ by at most this share (the camera is almost overhead)
 MAX_SIDE_MISMATCH = 0.15
-# Share of the corners' bounding box added on every side of a crop; overhead, as in digitizer.py
-MARGIN = 0.1
 # The photos are 6000x4000; crops are shrunk to this shorter side (pack_datasets shrinks further)
 MAX_SIDE = 1024
 JPEG_QUALITY = 95
@@ -131,14 +129,13 @@ def board_corners(photo: Path, warp: Path) -> list[tuple[float, float]] | None:
 
 
 def crop_box(corners: list[tuple[float, float]], width: int, height: int) -> tuple[int, int, int, int]:
-    """(x0, y0, x1, y1): the corners' bounding box, grown by ``MARGIN`` of its size and kept within the photo"""
+    """(x0, y0, x1, y1): the corners' bounding box, kept within the photo"""
     xs, ys = [x for x, _ in corners], [y for _, y in corners]
-    dx, dy = MARGIN * (max(xs) - min(xs)), MARGIN * (max(ys) - min(ys))
     return (
-        max(0, round(min(xs) - dx)),
-        max(0, round(min(ys) - dy)),
-        min(width, round(max(xs) + dx)),
-        min(height, round(max(ys) + dy)),
+        max(0, round(min(xs))),
+        max(0, round(min(ys))),
+        min(width, round(max(xs))),
+        min(height, round(max(ys))),
     )
 
 

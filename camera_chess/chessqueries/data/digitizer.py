@@ -38,8 +38,6 @@ GAMES = range(1, 21)
 # Games 15 and 20 are the same game recorded twice, so they share a split
 TEST_GAMES = frozenset({6, 15, 20})
 VAL_GAMES = frozenset({3, 17})
-# Of the board's side, around the corners; the camera is above the centre, so pieces lean out past the edges
-MARGIN = 0.1
 JPEG_QUALITY = 95
 RESULTS = {"1-0", "0-1", "1/2-1/2", "*"}
 
@@ -75,14 +73,13 @@ def placements(moves: list[str]) -> list[str]:
 
 
 def crop_box(corners: list[tuple[int, int]], width: int, height: int) -> tuple[int, int, int, int]:
-    """(x0, y0, x1, y1): the corners' bounding box, grown by ``MARGIN`` of its size and kept within the frame"""
+    """(x0, y0, x1, y1): the corners' bounding box, kept within the frame"""
     xs, ys = [x for x, _ in corners], [y for _, y in corners]
-    dx, dy = MARGIN * (max(xs) - min(xs)), MARGIN * (max(ys) - min(ys))
     return (
-        max(0, round(min(xs) - dx)),
-        max(0, round(min(ys) - dy)),
-        min(width, round(max(xs) + dx)),
-        min(height, round(max(ys) + dy)),
+        max(0, round(min(xs))),
+        max(0, round(min(ys))),
+        min(width, round(max(xs))),
+        min(height, round(max(ys))),
     )
 
 

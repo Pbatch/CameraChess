@@ -234,9 +234,19 @@ class LitChessQueriesModel(_ValMetricsMixin, pl.LightningModule):
         label_smoothing: float = 0.0,
         drop_path_rate: float = 0.0,  # encoder stochastic depth
         head_type: str = HeadType.QUERY,  # HeadType value; str accepted for ckpt hparams
+        teacher: nn.Module | None = None,  # frozen model whose soft labels the student also learns
+        distill_weight: float = 1.0,
+        distill_temperature: float = 2.0,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["teacher"])
+        # Kept in a list so it is not a submodule: it stays out of the state dict, checkpoints and
+        # exports, and out of the optimizer
+        self._teacher: list[nn.Module] = []
+        if teacher is not None:
+            for p in teacher.parameters():
+                p.requires_grad = False
+            self._teacher.append(teacher.eval())
         # The encoder starts frozen for a permanent probe (``freeze_encoder``) or
         # for the first phase of a staged unfreeze (``unfreeze_epoch > 0``).
         starts_frozen = freeze_encoder or unfreeze_epoch > 0
@@ -281,10 +291,35 @@ class LitChessQueriesModel(_ValMetricsMixin, pl.LightningModule):
             ) + nn.functional.cross_entropy(out["color"].reshape(-1, out["color"].shape[-1]), color_t.reshape(-1))
             loss = loss + self.hparams.aux_weight * aux
             self.log("train_aux", aux, prog_bar=False)
+        elif self._teacher:
+            logits = self(x)
+            hard = self._loss(logits, y)
+            distill = self._distill_loss(logits, x)
+            loss = hard + self.hparams.distill_weight * distill
+            self.log("train_hard", hard)
+            self.log("train_distill", distill)
         else:
             loss = self._loss(self(x), y)
         self.log("train_loss", loss, prog_bar=True)
         return loss
+
+    def _distill_loss(self, logits: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        """Per-square KL(teacher || student) at the distillation temperature, times its square
+        (Hinton et al.) so its gradients keep the hard loss's scale"""
+        t = self.hparams.distill_temperature
+        teacher = self._teacher[0]
+        teacher.eval()
+        with torch.no_grad():
+            target = nn.functional.log_softmax(teacher(x).float() / t, dim=-1)
+        student = nn.functional.log_softmax(logits.float() / t, dim=-1)
+        kl = nn.functional.kl_div(
+            student.reshape(-1, NUM_CLASSES), target.reshape(-1, NUM_CLASSES), log_target=True, reduction="batchmean"
+        )
+        return kl * t * t
+
+    def on_fit_start(self) -> None:
+        if self._teacher:
+            self._teacher[0].to(self.device)
 
     def _maybe_unfreeze(self, epoch: int) -> None:
         """Staged unfreeze: once ``epoch`` reaches ``unfreeze_epoch``, enable

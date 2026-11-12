@@ -53,9 +53,9 @@ def test_board_corners_come_from_the_board_row_only():
     assert board_corners(label.splitlines()[0]) is None
 
 
-def test_crop_grows_the_corners_box_within_the_photo():
+def test_crop_is_the_corners_box_in_pixels():
     corners = [(0.1, 0.0), (0.6, 0.0), (0.1, 0.5), (0.6, 0.5)]
-    assert crop_box(corners, 1000, 2000) == (25, 0, 675, 1150)
+    assert crop_box(corners, 1000, 2000) == (100, 0, 600, 1000)
 
 
 def test_games_link_close_positions_taken_with_one_camera():

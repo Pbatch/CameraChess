@@ -79,9 +79,9 @@ def test_no_board_when_the_warp_is_of_something_else(tmp_path):
     assert board_corners(tmp_path / "photo.jpg", tmp_path / "warp.png") is None
 
 
-def test_crop_grows_the_corners_box_within_the_photo():
-    corners = [(100.0, 10.0), (1100.0, 10.0), (100.0, 1010.0), (1100.0, 1010.0)]
-    assert crop_box(corners, 1920, 1080) == (0, 0, 1200, 1080)
+def test_crop_is_the_corners_box_within_the_photo():
+    corners = [(100.0, 10.0), (1100.0, 10.0), (100.0, 1110.0), (1100.0, 1110.0)]
+    assert crop_box(corners, 1920, 1080) == (100, 10, 1100, 1080)
 
 
 def test_loads_a_split(tmp_path, monkeypatch):

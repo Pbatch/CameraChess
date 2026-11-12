@@ -49,9 +49,9 @@ def test_illegal_move_fails():
         placements(["e5"])
 
 
-def test_crop_grows_the_corners_box_within_the_frame():
-    corners = [(100, 10), (1100, 10), (100, 1010), (1100, 1010)]
-    assert crop_box(corners, 1920, 1080) == (0, 0, 1200, 1080)
+def test_crop_is_the_corners_box_within_the_frame():
+    corners = [(100, 10), (1100, 10), (100, 1110), (1100, 1110)]
+    assert crop_box(corners, 1920, 1080) == (100, 10, 1100, 1080)
 
 
 def test_splits_are_whole_games_and_disjoint():

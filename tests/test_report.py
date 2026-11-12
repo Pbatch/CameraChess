@@ -18,15 +18,18 @@ def test_eval_tag():
     assert eval_tag("chessred", Split.TEST, sep="/") == "chessred/test"
 
 
-def test_resolve_split_split_datasets_and_splitless():
+def test_resolve_split_split_datasets_and_splitless(tmp_path):
     from camera_chess.chessqueries.data import get_dataset
+    from camera_chess.chessqueries.data.yunker import Yunker
 
     chessred = get_dataset(DatasetName.CHESSRED)
     assert resolve_split(chessred, "test") is Split.TEST
     with pytest.raises(SystemExit):
         resolve_split(chessred, None)  # split required
 
-    yunker = get_dataset(DatasetName.YUNKER)
+    # Yunker's crops are built locally (make_training_data) and aren't in CI, so an empty one stands in
+    (tmp_path / "annotations.json").write_text("[]")
+    yunker = Yunker(root=tmp_path)
     assert resolve_split(yunker, "train") is Split.TRAIN
 
 
