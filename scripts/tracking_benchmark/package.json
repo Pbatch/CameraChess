@@ -1,0 +1,9 @@
+{
+  "name": "tracking-benchmark",
+  "private": true,
+  "type": "module",
+  "description": "Replays saved model outputs through ChessCam's move tracking (scripts/tracking_benchmark/run.py)",
+  "dependencies": {
+    "@chesscam/recorder": "0.2.0"
+  }
+}

@@ -119,6 +119,41 @@ def test_probabilities_for_another_region_are_refused(dataset, monkeypatch, tmp_
         make_training_data.make("yunker/x", tmp_path)
 
 
+def test_each_crop_is_hashed_as_crop_yunker_hashes_it(dataset, monkeypatch, tmp_path):
+    rng = np.random.default_rng(0)
+    frames = rng.integers(0, 255, (400, 8, 8, 3), np.uint8)
+
+    class Reader:
+        def __init__(self, path):
+            pass
+
+        def __len__(self):
+            return len(frames)
+
+        def get_avg_fps(self):
+            return 4
+
+        def get_batch(self, indices):
+            class Batch:
+                def asnumpy(self):
+                    return frames[indices]
+
+            return Batch()
+
+    monkeypatch.setattr(make_training_data, "load_game", lambda d: GAME)
+    monkeypatch.setattr(make_training_data.decord, "VideoReader", Reader)
+    monkeypatch.setattr(make_training_data, "video_path", lambda d: tmp_path / "x.mp4")
+    (tmp_path / "images" / "train").mkdir(parents=True)
+    annotations = make_training_data.make("yunker/x", tmp_path)
+    assert annotations
+    script = make_training_data.crop_script()
+    for a in annotations:
+        frame = frames[make_training_data.frame_index(a["time"], 4, len(frames))]
+        # crop_yunker crops the BGR frame OpenCV reads
+        bgr = script.crop(frame[..., ::-1], [0, 0, 8, 8], [0, 0, 1, 1])
+        assert a["crop_hash"] == script.dhash(bgr)
+
+
 # White's pawn takes the rook on g8 and promotes; Black's knight then takes the new piece
 PROMOTION = {
     "moves": ["e2e4", "f7f5", "e4f5", "g7g6", "f5g6", "g8f6", "g6h7", "h8g8", "h7g8q", "f6g8"],
