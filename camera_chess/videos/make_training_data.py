@@ -29,23 +29,26 @@ Usage: python -m camera_chess.videos.make_training_data -d yunker/D81hFXZ0Cp4 [-
 -u uses a dataset's labels without MODEL's check, e.g. one an earlier build checked with another model.
        python -m camera_chess.videos.make_training_data --measure-offset -d yunker/LEYxdEWJXCg [-d ...]
 Writes the crops to <out>/images/train/ and annotations.json (image, fen, split, group, box, time,
-model_agreement), laid out as ChessQueries' ChessCam dataset. The output folder is rebuilt from scratch on each run,
+model_agreement, crop_hash), laid out as ChessQueries' ChessCam dataset. The output folder is rebuilt from scratch on each run,
 unless --add, which keeps the other datasets there and redoes only these.
 """
 
 import argparse
 import gzip
+import importlib.util
 import json
 import shutil
+from functools import cache
 from pathlib import Path
 
 import chess
+import cv2
 import decord
 import numpy as np
 from loguru import logger
 from PIL import Image
 
-from camera_chess.config import get_config
+from camera_chess.config import REPO_ROOT, get_config
 from camera_chess.videos.config import load_config, usable, video_path
 from camera_chess.videos.overlay_moves import read_pawns_left
 
@@ -75,6 +78,16 @@ MAX_DROPPED = 0.2
 JPEG_QUALITY = 95
 # The model whose readings catch bad labels: the 320 fine-tune of v10, about 2.35x faster to run than the app's 448
 MODEL = "chessq-ft-v10-dinov3-320"
+
+
+@cache
+def crop_script():
+    """hf/yunker-chess/crop_yunker.py, the Hugging Face dataset's script, whose dhash each crop's crop_hash is"""
+    spec = importlib.util.spec_from_file_location("crop_yunker", REPO_ROOT / "hf" / "yunker-chess" / "crop_yunker.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def load_probs(dataset):
@@ -172,9 +185,15 @@ def crop(frame, box, overlay):
     return out
 
 
-def make(dataset, out_dir, checked=True):
-    """The dataset's annotations, with its crops written to out_dir, or [] if its labels look wrong. Unless `checked`
-    is False, when its labels are used without MODEL's readings (model_agreement is then null)."""
+def frame_index(t, fps, count):
+    """The index of the video frame shown `t` seconds in, of `count` frames at `fps`"""
+    return min(count - 1, round(t * fps))
+
+
+def choose(dataset, checked=True):
+    """(board, time, model_agreement) of the frames to use from the dataset, or [] if its labels look wrong, and a
+    note on how they were checked. Unless `checked` is False, when its labels are used without MODEL's readings
+    (model_agreement is then None)."""
     config = load_config(dataset)
     game = load_game(dataset)
     if checked:
@@ -186,14 +205,14 @@ def make(dataset, out_dir, checked=True):
             )
     if game.get("end_mismatches", 0) > END_MISMATCHES:
         logger.warning(f"{dataset}: the overlay's last position disagrees with the moves read; skipped")
-        return []
+        return [], "skipped"
 
     kept, dropped = [], 0
     for board, t in frame_times(game):
         if not checked:
             kept.append((board, t, None))
             continue
-        index = min(len(probs) - 1, round(t * meta["fps"]))
+        index = frame_index(t, meta["fps"], len(probs))
         agreement = int((probs[index].argmax(-1) == labels(board)).sum())
         if 64 - agreement > MAX_DISAGREEMENTS:
             dropped += 1
@@ -202,11 +221,19 @@ def make(dataset, out_dir, checked=True):
     total = len(kept) + dropped
     if total == 0 or dropped > MAX_DROPPED * total:
         logger.warning(f"{dataset}: the model disagrees with {dropped} of {total} labels; skipped for a look")
-        return []
+        return [], "skipped"
+    return kept, f"{dropped} dropped" if checked else "labels not checked"
 
+
+def make(dataset, out_dir, checked=True):
+    """The dataset's annotations, with its crops written to out_dir, or [] if its labels look wrong (see choose)"""
+    kept, note = choose(dataset, checked)
+    if not kept:
+        return []
+    config = load_config(dataset)
     reader = decord.VideoReader(str(video_path(dataset)))
     fps = reader.get_avg_fps()
-    frames = reader.get_batch([min(len(reader) - 1, round(t * fps)) for _, t, _ in kept]).asnumpy()
+    frames = reader.get_batch([frame_index(t, fps, len(reader)) for _, t, _ in kept]).asnumpy()
     height, width = frames.shape[1:3]
     box = crop_box(config["roi"], width, height)
     x, y, w, h = config["roi"]
@@ -214,7 +241,8 @@ def make(dataset, out_dir, checked=True):
     annotations = []
     for (board, t, agreement), frame in zip(kept, frames):
         image = f"images/train/{name}_{round(t * 100):06d}.jpg"
-        Image.fromarray(crop(frame, box, config["overlay_roi"])).save(out_dir / image, quality=JPEG_QUALITY)
+        cropped = crop(frame, box, config["overlay_roi"])
+        Image.fromarray(cropped).save(out_dir / image, quality=JPEG_QUALITY)
         annotations.append(
             {
                 "image": image,
@@ -225,10 +253,11 @@ def make(dataset, out_dir, checked=True):
                 "box": [x - box[0], y - box[1], w, h],
                 "time": round(t, 2),
                 "model_agreement": agreement,
+                # Of the crop before JPEG, as crop_yunker.py hashes the crops it makes
+                "crop_hash": crop_script().dhash(cv2.cvtColor(cropped, cv2.COLOR_RGB2BGR)),
             }
         )
-    note = f"{dropped} dropped" if checked else "labels not checked"
-    logger.info(f"{dataset}: {len(annotations)} frames from {len(game['moves'])} moves ({note})")
+    logger.info(f"{dataset}: {len(annotations)} frames from {len(load_game(dataset)['moves'])} moves ({note})")
     return annotations
 
 
